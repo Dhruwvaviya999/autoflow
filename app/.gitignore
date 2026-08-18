@@ -1,0 +1,7 @@
+*.zip
+*.apk
+*.aab
+/build/
+.idea/
+*.iml
+local.properties
