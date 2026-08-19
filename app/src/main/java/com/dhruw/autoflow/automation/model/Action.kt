@@ -55,6 +55,20 @@ sealed interface Action {
      * grow without bound.
      */
     data object SaveNotificationAction : Action
+
+    /**
+     * Run a UI automation workflow on [targetPackage] using Android
+     * Accessibility. [steps] is an ordered list of [UiStep]s executed by the
+     * UiAutomationExecutor once the accessibility service is enabled.
+     * [overallTimeoutMillis] bounds the whole run. Only one UI automation may
+     * run at a time. All processing is on-device; no network.
+     */
+    data class UiAutomationAction(
+        val targetPackage: String,
+        val targetLabel: String = "",
+        val steps: List<UiStep> = emptyList(),
+        val overallTimeoutMillis: Long = 60_000
+    ) : Action
 }
 
 val Action.displayName: String
@@ -67,6 +81,7 @@ val Action.displayName: String
         is Action.RenameFileAction -> "Rename file"
         is Action.InstagramAnalysisAction -> "Instagram analysis"
         is Action.SaveNotificationAction -> "Save notification"
+        is Action.UiAutomationAction -> "UI automation"
     }
 
 val Action.summary: String
@@ -82,4 +97,8 @@ val Action.summary: String
         is Action.RenameFileAction -> "Rename to \"${newName.trim()}\""
         is Action.InstagramAnalysisAction -> "Find who doesn't follow back"
         is Action.SaveNotificationAction -> "Keep the notification on this device"
+        is Action.UiAutomationAction -> buildString {
+            append(steps.size).append(if (steps.size == 1) " step" else " steps")
+            append(" on ").append(targetLabel.ifBlank { targetPackage.ifBlank { "an app" } })
+        }
     }
