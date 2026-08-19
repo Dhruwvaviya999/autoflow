@@ -1,5 +1,6 @@
 package com.dhruw.autoflow.automation.engine
 
+import com.dhruw.autoflow.automation.model.SystemEvent
 import com.dhruw.autoflow.automation.model.Trigger
 import com.dhruw.autoflow.automation.model.TriggerPayload
 import com.dhruw.autoflow.data.repository.AutomationRepository
@@ -27,7 +28,32 @@ class AutomationEventDispatcher(
         when (event) {
             is TriggerPayload.NotificationEvent -> dispatchNotification(event)
             is TriggerPayload.FileEvent -> Unit // handled by FileScanWorker (see class doc)
+            is SystemEvent -> dispatchSystem(event)
         }
+    }
+
+    /**
+     * System events arrive pre-deduplicated from [SystemStateTracker]
+     * (edge-trigger semantics), so this only routes: cheap trigger-type +
+     * config filter first, engine (conditions/actions) only for matches.
+     */
+    private suspend fun dispatchSystem(event: SystemEvent) {
+        val matching = enabledAutomations().filter { it.trigger.matchesSystem(event) }
+        for (automation in matching) {
+            runner.run(automation, event)
+        }
+    }
+
+    private fun Trigger.matchesSystem(event: SystemEvent): Boolean = when (this) {
+        is Trigger.BatteryLevelTrigger -> event is SystemEvent.BatteryChanged && matches(event)
+        is Trigger.ChargingStateTrigger -> event is SystemEvent.ChargingChanged && matches(event)
+        is Trigger.WiFiConnectionTrigger -> event is SystemEvent.WiFiChanged && matches(event)
+        is Trigger.NetworkAvailabilityTrigger -> event is SystemEvent.NetworkChanged && matches(event)
+        is Trigger.BluetoothConnectionTrigger -> event is SystemEvent.BluetoothChanged && matches(event)
+        is Trigger.ScreenStateTrigger -> event is SystemEvent.ScreenChanged && matches(event)
+        is Trigger.HeadsetConnectionTrigger -> event is SystemEvent.HeadsetChanged && matches(event)
+        is Trigger.DeviceBootTrigger -> event is SystemEvent.DeviceBooted
+        else -> false
     }
 
     private suspend fun dispatchNotification(event: TriggerPayload.NotificationEvent) {

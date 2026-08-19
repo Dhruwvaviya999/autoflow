@@ -2,6 +2,8 @@ package com.dhruw.autoflow.data.local.converters
 
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
+import com.dhruw.autoflow.automation.model.ConnectionEvent
+import com.dhruw.autoflow.automation.model.LevelComparison
 import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
 import org.json.JSONArray
@@ -26,6 +28,14 @@ object WorkflowJson {
     private const val TRIGGER_TIME = "time"
     private const val TRIGGER_FILE = "file"
     private const val TRIGGER_NOTIFICATION = "notification"
+    private const val TRIGGER_BATTERY_LEVEL = "battery_level"
+    private const val TRIGGER_CHARGING_STATE = "charging_state"
+    private const val TRIGGER_WIFI_CONNECTION = "wifi_connection"
+    private const val TRIGGER_NETWORK_AVAILABILITY = "network_availability"
+    private const val TRIGGER_BLUETOOTH_CONNECTION = "bluetooth_connection"
+    private const val TRIGGER_SCREEN_STATE = "screen_state"
+    private const val TRIGGER_HEADSET_CONNECTION = "headset_connection"
+    private const val TRIGGER_DEVICE_BOOT = "device_boot"
     private const val CONDITION_ALWAYS = "always"
     private const val CONDITION_FILE_EXTENSION = "file_extension"
     private const val CONDITION_FILE_NAME_CONTAINS = "file_name_contains"
@@ -37,6 +47,12 @@ object WorkflowJson {
     private const val CONDITION_AND = "and"
     private const val CONDITION_OR = "or"
     private const val CONDITION_NOT = "not"
+    private const val CONDITION_BATTERY_LEVEL = "battery_level"
+    private const val CONDITION_IS_CHARGING = "is_charging"
+    private const val CONDITION_NETWORK_AVAILABLE = "network_available"
+    private const val CONDITION_WIFI_CONNECTED = "wifi_connected"
+    private const val CONDITION_SCREEN_ON = "screen_on"
+    private const val CONDITION_BLUETOOTH_CONNECTED = "bluetooth_connected"
     private const val ACTION_SHOW_NOTIFICATION = "show_notification"
     private const val ACTION_DELAY = "delay"
     private const val ACTION_LOG = "log"
@@ -73,6 +89,32 @@ object WorkflowJson {
                 textPattern = json.optString("textPattern", ""),
                 matchMode = TextMatchMode.valueOf(json.optString("matchMode", TextMatchMode.CONTAINS.name))
             )
+            TRIGGER_BATTERY_LEVEL -> Trigger.BatteryLevelTrigger(
+                comparison = LevelComparison.valueOf(json.getString("comparison")),
+                level = json.getInt("level")
+            )
+            TRIGGER_CHARGING_STATE -> Trigger.ChargingStateTrigger(
+                onCharging = json.getBoolean("onCharging")
+            )
+            TRIGGER_WIFI_CONNECTION -> Trigger.WiFiConnectionTrigger(
+                event = ConnectionEvent.valueOf(json.getString("event")),
+                ssid = json.optString("ssid", "")
+            )
+            TRIGGER_NETWORK_AVAILABILITY -> Trigger.NetworkAvailabilityTrigger(
+                onAvailable = json.getBoolean("onAvailable")
+            )
+            TRIGGER_BLUETOOTH_CONNECTION -> Trigger.BluetoothConnectionTrigger(
+                event = ConnectionEvent.valueOf(json.getString("event")),
+                deviceAddress = json.optString("deviceAddress", ""),
+                deviceName = json.optString("deviceName", "")
+            )
+            TRIGGER_SCREEN_STATE -> Trigger.ScreenStateTrigger(
+                onScreenOn = json.getBoolean("onScreenOn")
+            )
+            TRIGGER_HEADSET_CONNECTION -> Trigger.HeadsetConnectionTrigger(
+                event = ConnectionEvent.valueOf(json.getString("event"))
+            )
+            TRIGGER_DEVICE_BOOT -> Trigger.DeviceBootTrigger
             else -> throw WorkflowJsonException("Unknown trigger type: $type")
         }
     }
@@ -97,6 +139,33 @@ object WorkflowJson {
             .put("titlePattern", trigger.titlePattern)
             .put("textPattern", trigger.textPattern)
             .put("matchMode", trigger.matchMode.name)
+        is Trigger.BatteryLevelTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_BATTERY_LEVEL)
+            .put("comparison", trigger.comparison.name)
+            .put("level", trigger.level)
+        is Trigger.ChargingStateTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_CHARGING_STATE)
+            .put("onCharging", trigger.onCharging)
+        is Trigger.WiFiConnectionTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_WIFI_CONNECTION)
+            .put("event", trigger.event.name)
+            .put("ssid", trigger.ssid)
+        is Trigger.NetworkAvailabilityTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_NETWORK_AVAILABILITY)
+            .put("onAvailable", trigger.onAvailable)
+        is Trigger.BluetoothConnectionTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_BLUETOOTH_CONNECTION)
+            .put("event", trigger.event.name)
+            .put("deviceAddress", trigger.deviceAddress)
+            .put("deviceName", trigger.deviceName)
+        is Trigger.ScreenStateTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_SCREEN_STATE)
+            .put("onScreenOn", trigger.onScreenOn)
+        is Trigger.HeadsetConnectionTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_HEADSET_CONNECTION)
+            .put("event", trigger.event.name)
+        is Trigger.DeviceBootTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_DEVICE_BOOT)
     }
 
     // --- Conditions ---
@@ -145,6 +214,26 @@ object WorkflowJson {
             CONDITION_NOT -> Condition.NotCondition(
                 condition = decodeCondition(json.getJSONObject("condition"))
             )
+            CONDITION_BATTERY_LEVEL -> Condition.BatteryLevelCondition(
+                comparison = LevelComparison.valueOf(json.getString("comparison")),
+                level = json.getInt("level")
+            )
+            CONDITION_IS_CHARGING -> Condition.IsChargingCondition(
+                charging = json.getBoolean("charging")
+            )
+            CONDITION_NETWORK_AVAILABLE -> Condition.NetworkAvailableCondition(
+                available = json.getBoolean("available")
+            )
+            CONDITION_WIFI_CONNECTED -> Condition.WiFiConnectedCondition(
+                ssid = json.optString("ssid", "")
+            )
+            CONDITION_SCREEN_ON -> Condition.ScreenOnCondition(
+                on = json.getBoolean("on")
+            )
+            CONDITION_BLUETOOTH_CONNECTED -> Condition.BluetoothConnectedCondition(
+                deviceAddress = json.optString("deviceAddress", ""),
+                deviceName = json.optString("deviceName", "")
+            )
             else -> throw WorkflowJsonException("Unknown condition type: $type")
         }
 
@@ -184,6 +273,26 @@ object WorkflowJson {
         is Condition.NotCondition -> JSONObject()
             .put(KEY_TYPE, CONDITION_NOT)
             .put("condition", conditionToJson(condition.condition))
+        is Condition.BatteryLevelCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_BATTERY_LEVEL)
+            .put("comparison", condition.comparison.name)
+            .put("level", condition.level)
+        is Condition.IsChargingCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_IS_CHARGING)
+            .put("charging", condition.charging)
+        is Condition.NetworkAvailableCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NETWORK_AVAILABLE)
+            .put("available", condition.available)
+        is Condition.WiFiConnectedCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_WIFI_CONNECTED)
+            .put("ssid", condition.ssid)
+        is Condition.ScreenOnCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_SCREEN_ON)
+            .put("on", condition.on)
+        is Condition.BluetoothConnectedCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_BLUETOOTH_CONNECTED)
+            .put("deviceAddress", condition.deviceAddress)
+            .put("deviceName", condition.deviceName)
     }
 
     // --- Actions ---

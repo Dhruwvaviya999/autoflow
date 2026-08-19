@@ -25,8 +25,17 @@ import com.dhruw.autoflow.services.files.RenameFileActionHandler
 import com.dhruw.autoflow.services.files.SafFileAccess
 import com.dhruw.autoflow.services.files.WorkManagerFileMonitor
 import com.dhruw.autoflow.automation.engine.AutomationEventDispatcher
+import com.dhruw.autoflow.automation.engine.ConditionEvaluator
+import com.dhruw.autoflow.automation.engine.SystemStateTracker
+import com.dhruw.autoflow.automation.model.SystemEvent
 import com.dhruw.autoflow.data.repository.NotificationRecordRepository
 import com.dhruw.autoflow.data.repository.RoomNotificationRecordRepository
+import com.dhruw.autoflow.services.system.AndroidDeviceStateProvider
+import com.dhruw.autoflow.services.system.AudioDeviceMonitor
+import com.dhruw.autoflow.services.system.BatteryMonitor
+import com.dhruw.autoflow.services.system.NetworkMonitor
+import com.dhruw.autoflow.services.system.ScreenMonitor
+import com.dhruw.autoflow.services.system.SystemMonitorHub
 import com.dhruw.autoflow.services.instagram.InstagramAnalysisActionHandler
 import com.dhruw.autoflow.services.notification.AutomationNotifier
 import com.dhruw.autoflow.services.notification.InstalledApps
@@ -36,6 +45,7 @@ import com.dhruw.autoflow.services.notification.ShowNotificationActionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 /** Manual dependency wiring; one instance per process, owned by the Application. */
 class AppContainer(context: Context) {
@@ -74,7 +84,13 @@ class AppContainer(context: Context) {
 
     val instagramAnalysisStore = InstagramAnalysisStore()
 
+    /** Edge detection for system triggers; in-memory by design (see class doc). */
+    val systemStateTracker = SystemStateTracker()
+
+    private val deviceStateProvider = AndroidDeviceStateProvider(appContext, systemStateTracker)
+
     private val engine = AutomationEngine(
+        conditionEvaluator = ConditionEvaluator(deviceStateProvider),
         handlers = listOf(
             ShowNotificationActionHandler(notifier),
             DelayActionHandler(),
@@ -95,8 +111,32 @@ class AppContainer(context: Context) {
 
     val runner = AutomationRunner(engine, automationRepository, executionRepository)
 
-    /** Push-style trigger events (notifications) enter the engine through here. */
+    /** Push-style trigger events (notifications, system) enter the engine through here. */
     val eventDispatcher = AutomationEventDispatcher(automationRepository, runner)
+
+    private val dispatchSystemEvent: (SystemEvent) -> Unit = { event ->
+        applicationScope.launch {
+            try {
+                eventDispatcher.dispatch(event)
+            } catch (e: Exception) {
+                Log.w("AutoFlowSystemHub", "System dispatch failed: ${e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    /**
+     * Callback-based system monitors (battery, network/Wi-Fi, screen,
+     * audio). Started once from Application.onCreate; boot and Bluetooth use
+     * manifest receivers instead so they work without a running process.
+     */
+    val systemMonitorHub = SystemMonitorHub(
+        listOf(
+            BatteryMonitor(appContext, systemStateTracker, dispatchSystemEvent),
+            NetworkMonitor(appContext, systemStateTracker, dispatchSystemEvent),
+            ScreenMonitor(appContext, systemStateTracker, dispatchSystemEvent),
+            AudioDeviceMonitor(appContext, systemStateTracker, dispatchSystemEvent)
+        )
+    )
 
     val scheduler: AutomationScheduler =
         WorkManagerAutomationScheduler(appContext, fileMonitor)

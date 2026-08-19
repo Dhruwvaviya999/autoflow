@@ -10,9 +10,13 @@ import java.util.Locale
  * File conditions need the run's [TriggerPayload.FileEvent] and notification
  * conditions the run's [TriggerPayload.NotificationEvent]; without the right
  * payload they fail, which turns the run into a SKIPPED execution rather
- * than a crash or a blind pass.
+ * than a crash or a blind pass. System conditions read the CURRENT device
+ * state from [deviceState]; without a provider (or when a value is unknown)
+ * they fail the same way.
  */
-open class ConditionEvaluator {
+open class ConditionEvaluator(
+    private val deviceState: DeviceStateProvider? = null
+) {
 
     open fun evaluate(condition: Condition, payload: TriggerPayload? = null): Boolean {
         val file = payload as? TriggerPayload.FileEvent
@@ -53,6 +57,27 @@ open class ConditionEvaluator {
             is Condition.AndCondition -> condition.conditions.all { evaluate(it, payload) }
             is Condition.OrCondition -> condition.conditions.any { evaluate(it, payload) }
             is Condition.NotCondition -> !evaluate(condition.condition, payload)
+            is Condition.BatteryLevelCondition -> deviceState?.batteryLevel()
+                ?.let { condition.comparison.matches(it, condition.level) } == true
+            is Condition.IsChargingCondition ->
+                deviceState?.isCharging() == condition.charging
+            is Condition.NetworkAvailableCondition ->
+                deviceState?.isNetworkAvailable() == condition.available
+            is Condition.WiFiConnectedCondition ->
+                if (condition.ssid.isBlank()) {
+                    deviceState?.isWifiConnected() == true
+                } else {
+                    deviceState?.connectedWifiSsid()
+                        ?.equals(condition.ssid.trim(), ignoreCase = true) == true
+                }
+            is Condition.ScreenOnCondition ->
+                deviceState?.isScreenOn() == condition.on
+            is Condition.BluetoothConnectedCondition ->
+                if (condition.deviceAddress.isBlank()) {
+                    deviceState?.isAnyBluetoothDeviceConnected() == true
+                } else {
+                    deviceState?.isBluetoothDeviceConnected(condition.deviceAddress.trim()) == true
+                }
         }
     }
 

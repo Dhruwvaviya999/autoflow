@@ -73,6 +73,44 @@ sealed interface Condition {
 
     /** Passes when [condition] fails. */
     data class NotCondition(val condition: Condition) : Condition
+
+    /**
+     * System conditions read the device's CURRENT state (not the trigger
+     * payload) through the engine's DeviceStateProvider, so they compose
+     * with any trigger — e.g. "WHEN notification arrives IF battery < 20%".
+     * When a state value is unavailable they fail, never guess.
+     */
+
+    /** Passes when the current battery level compares against [level]. */
+    data class BatteryLevelCondition(
+        val comparison: LevelComparison,
+        val level: Int
+    ) : Condition
+
+    /** Passes when the device is charging ([charging] true) or not (false). */
+    data class IsChargingCondition(val charging: Boolean = true) : Condition
+
+    /** Passes when the default network is available ([available] true) or not. */
+    data class NetworkAvailableCondition(val available: Boolean = true) : Condition
+
+    /**
+     * Passes when connected to Wi-Fi. Blank [ssid] = any network; a set SSID
+     * needs Android to expose the network name (location permission).
+     */
+    data class WiFiConnectedCondition(val ssid: String = "") : Condition
+
+    /** Passes when the screen is on ([on] true) or off (false). */
+    data class ScreenOnCondition(val on: Boolean = true) : Condition
+
+    /**
+     * Passes when a Bluetooth device is connected. Blank [deviceAddress] =
+     * any device. Connection state is tracked from Bluetooth events observed
+     * since process start; an unobserved device counts as not connected.
+     */
+    data class BluetoothConnectedCondition(
+        val deviceAddress: String = "",
+        val deviceName: String = ""
+    ) : Condition
 }
 
 val Condition.displayName: String
@@ -88,6 +126,12 @@ val Condition.displayName: String
         is Condition.AndCondition -> "All of"
         is Condition.OrCondition -> "Any of"
         is Condition.NotCondition -> "Not"
+        is Condition.BatteryLevelCondition -> "Battery level"
+        is Condition.IsChargingCondition -> "Charging"
+        is Condition.NetworkAvailableCondition -> "Network"
+        is Condition.WiFiConnectedCondition -> "Wi-Fi"
+        is Condition.ScreenOnCondition -> "Screen"
+        is Condition.BluetoothConnectedCondition -> "Bluetooth device"
     }
 
 private val TextMatchMode.summaryVerb: String
@@ -123,4 +167,16 @@ val Condition.summary: String
         is Condition.OrCondition ->
             if (conditions.isEmpty()) "Never" else conditions.joinToString(" OR ") { it.summary }
         is Condition.NotCondition -> "NOT (${condition.summary})"
+        is Condition.BatteryLevelCondition -> "Battery ${comparison.label.lowercase()} $level%"
+        is Condition.IsChargingCondition -> if (charging) "Phone is charging" else "Phone is not charging"
+        is Condition.NetworkAvailableCondition ->
+            if (available) "Network is available" else "Network is unavailable"
+        is Condition.WiFiConnectedCondition ->
+            if (ssid.isBlank()) "Connected to any Wi-Fi" else "Connected to \"${ssid.trim()}\""
+        is Condition.ScreenOnCondition -> if (on) "Screen is on" else "Screen is off"
+        is Condition.BluetoothConnectedCondition -> when {
+            deviceName.isNotBlank() -> "${deviceName.trim()} is connected"
+            deviceAddress.isNotBlank() -> "${deviceAddress.trim()} is connected"
+            else -> "Any Bluetooth device is connected"
+        }
     }

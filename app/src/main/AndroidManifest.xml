@@ -5,6 +5,22 @@
     <!-- Required so ShowNotificationAction can post notifications on Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
+    <!-- Device Boot trigger: re-arm monitors and run boot automations. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Bluetooth triggers: receiving ACL connect/disconnect broadcasts and
+         reading device names on Android 12+ needs this runtime permission.
+         Requested only when the user configures a Bluetooth automation. -->
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission
+        android:name="android.permission.BLUETOOTH"
+        android:maxSdkVersion="30" />
+
+    <!-- Wi-Fi SSID triggers only: Android hides network names without fine
+         location. Requested only when the user filters by a specific SSID;
+         "any network" automations work without it. Never used for location. -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+
     <!-- Lets the app picker list launchable apps as notification sources
          (package visibility on Android 11+). No broad QUERY_ALL_PACKAGES. -->
     <queries>
@@ -48,6 +64,26 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- BOOT_COMPLETED and Bluetooth ACL broadcasts are protected system
+             broadcasts (only the OS can send them), so exporting is safe.
+             Both receivers only enqueue a WorkManager job. -->
+        <receiver
+            android:name=".services.system.BootReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".services.system.BluetoothEventReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

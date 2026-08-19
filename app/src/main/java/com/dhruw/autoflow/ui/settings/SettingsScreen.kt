@@ -2,6 +2,7 @@ package com.dhruw.autoflow.ui.settings
 
 import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.PowerManager
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryChargingFull
+import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
@@ -32,6 +34,7 @@ import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -50,6 +53,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.dhruw.autoflow.AutoFlowApplication
 import com.dhruw.autoflow.services.notification.NotificationAccessManager
@@ -80,6 +84,22 @@ fun SettingsScreen(
         (context.applicationContext as AutoFlowApplication).container.notificationAccessManager
     }
     val notificationAccess = remember(refreshKey) { accessManager.status() }
+    // Bluetooth is a runtime permission only from Android 12.
+    val bluetoothAllowed = remember(refreshKey) {
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val locationAllowed = remember(refreshKey) {
+        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED
+    }
+    val bluetoothLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshKey++ }
+    val locationLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { refreshKey++ }
     val ignoringBatteryOptimizations = remember(refreshKey) {
         context.getSystemService(PowerManager::class.java)
             ?.isIgnoringBatteryOptimizations(context.packageName) == true
@@ -158,6 +178,40 @@ fun SettingsScreen(
                     null
                 } else {
                     { context.startActivity(accessManager.settingsIntent()) }
+                }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
+                icon = Icons.Outlined.Bluetooth,
+                title = "Bluetooth",
+                description = if (bluetoothAllowed) {
+                    "Allowed — Bluetooth automations can react to devices"
+                } else {
+                    "Not allowed — needed only for Bluetooth triggers. Tap to allow."
+                },
+                statusColor = if (bluetoothAllowed) StatusColor.OK else StatusColor.NEUTRAL,
+                onClick = if (bluetoothAllowed) null else {
+                    {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                            bluetoothLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+                        }
+                    }
+                }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
+                icon = Icons.Outlined.Wifi,
+                title = "Wi-Fi network names",
+                description = if (locationAllowed) {
+                    "Available — automations can match specific Wi-Fi names"
+                } else {
+                    "Android needs the Location permission to reveal Wi-Fi names. " +
+                        "Only needed to match a specific network; \"any network\" " +
+                        "works without it. Tap to allow."
+                },
+                statusColor = if (locationAllowed) StatusColor.OK else StatusColor.NEUTRAL,
+                onClick = if (locationAllowed) null else {
+                    { locationLauncher.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
                 }
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)

@@ -5,9 +5,17 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Cancel
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Headset
+import androidx.compose.material.icons.outlined.NetworkCheck
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.Smartphone
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Extension
@@ -43,6 +51,14 @@ val Trigger.icon: ImageVector
         is Trigger.TimeTrigger -> Icons.Outlined.Schedule
         is Trigger.FileTrigger -> Icons.Outlined.FolderOpen
         is Trigger.NotificationTrigger -> Icons.Outlined.NotificationsActive
+        is Trigger.BatteryLevelTrigger -> Icons.Outlined.BatteryAlert
+        is Trigger.ChargingStateTrigger -> Icons.Outlined.Bolt
+        is Trigger.WiFiConnectionTrigger -> Icons.Outlined.Wifi
+        is Trigger.NetworkAvailabilityTrigger -> Icons.Outlined.NetworkCheck
+        is Trigger.BluetoothConnectionTrigger -> Icons.Outlined.Bluetooth
+        is Trigger.ScreenStateTrigger -> Icons.Outlined.Smartphone
+        is Trigger.HeadsetConnectionTrigger -> Icons.Outlined.Headset
+        is Trigger.DeviceBootTrigger -> Icons.Outlined.RestartAlt
     }
 
 val Condition.icon: ImageVector
@@ -58,6 +74,12 @@ val Condition.icon: ImageVector
         is Condition.AndCondition -> Icons.Outlined.AccountTree
         is Condition.OrCondition -> Icons.Outlined.AccountTree
         is Condition.NotCondition -> Icons.Outlined.Block
+        is Condition.BatteryLevelCondition -> Icons.Outlined.BatteryAlert
+        is Condition.IsChargingCondition -> Icons.Outlined.Bolt
+        is Condition.NetworkAvailableCondition -> Icons.Outlined.NetworkCheck
+        is Condition.WiFiConnectedCondition -> Icons.Outlined.Wifi
+        is Condition.ScreenOnCondition -> Icons.Outlined.Smartphone
+        is Condition.BluetoothConnectedCondition -> Icons.Outlined.Bluetooth
     }
 
 val Action.icon: ImageVector

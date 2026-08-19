@@ -23,6 +23,9 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.BatteryAlert
+import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.Bolt
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
@@ -30,16 +33,21 @@ import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Extension
 import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.FolderOpen
+import androidx.compose.material.icons.outlined.Headset
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.Smartphone
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -83,6 +91,13 @@ private sealed interface EditorDialog {
     data object Time : EditorDialog
     data object File : EditorDialog
     data object NotificationTrigger : EditorDialog
+    data object BatteryTrigger : EditorDialog
+    data object ChargingTrigger : EditorDialog
+    data object WiFiTrigger : EditorDialog
+    data object NetworkTrigger : EditorDialog
+    data object BluetoothTrigger : EditorDialog
+    data object ScreenTrigger : EditorDialog
+    data object HeadsetTrigger : EditorDialog
     data object FileExtension : EditorDialog
     data object FileNameContains : EditorDialog
     data object FileSize : EditorDialog
@@ -90,6 +105,12 @@ private sealed interface EditorDialog {
     data object NotificationTitle : EditorDialog
     data object NotificationText : EditorDialog
     data object NotificationCategory : EditorDialog
+    data object BatteryCondition : EditorDialog
+    data object ChargingCondition : EditorDialog
+    data object NetworkCondition : EditorDialog
+    data object WiFiCondition : EditorDialog
+    data object ScreenCondition : EditorDialog
+    data object BluetoothCondition : EditorDialog
     data class CopyFile(val index: Int?) : EditorDialog
     data class MoveFile(val index: Int?) : EditorDialog
     data class RenameFile(val index: Int?) : EditorDialog
@@ -201,6 +222,13 @@ fun AutomationEditorScreen(
                             is Trigger.FileTrigger -> dialog = EditorDialog.File
                             is Trigger.NotificationTrigger ->
                                 dialog = EditorDialog.NotificationTrigger
+                            is Trigger.BatteryLevelTrigger -> dialog = EditorDialog.BatteryTrigger
+                            is Trigger.ChargingStateTrigger -> dialog = EditorDialog.ChargingTrigger
+                            is Trigger.WiFiConnectionTrigger -> dialog = EditorDialog.WiFiTrigger
+                            is Trigger.NetworkAvailabilityTrigger -> dialog = EditorDialog.NetworkTrigger
+                            is Trigger.BluetoothConnectionTrigger -> dialog = EditorDialog.BluetoothTrigger
+                            is Trigger.ScreenStateTrigger -> dialog = EditorDialog.ScreenTrigger
+                            is Trigger.HeadsetConnectionTrigger -> dialog = EditorDialog.HeadsetTrigger
                             else -> sheet = EditorSheet.TRIGGER
                         }
                     },
@@ -261,52 +289,144 @@ fun AutomationEditorScreen(
     }
 
     when (sheet) {
-        EditorSheet.TRIGGER -> PickerSheet(
+        EditorSheet.TRIGGER -> SectionedPickerSheet(
             title = "Choose trigger",
-            options = listOf(
-                PickerOption(Icons.Outlined.TouchApp, "Manual", "Run it yourself with the Run button") {
-                    viewModel.setTrigger(Trigger.ManualTrigger)
-                },
-                PickerOption(Icons.Outlined.Schedule, "Time", "Runs at a scheduled time") {
-                    dialog = EditorDialog.Time
-                },
-                PickerOption(Icons.Outlined.FolderOpen, "File", "Runs when a matching file appears in a folder") {
-                    dialog = EditorDialog.File
-                },
-                PickerOption(Icons.Outlined.NotificationsActive, "Notification", "Runs when another app posts a notification") {
-                    dialog = EditorDialog.NotificationTrigger
-                }
+            sections = listOf(
+                PickerSection(
+                    "Schedule",
+                    listOf(
+                        PickerOption(Icons.Outlined.TouchApp, "Manual", "Run it yourself with the Run button") {
+                            viewModel.setTrigger(Trigger.ManualTrigger)
+                        },
+                        PickerOption(Icons.Outlined.Schedule, "Time", "Runs at a scheduled time") {
+                            dialog = EditorDialog.Time
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Content",
+                    listOf(
+                        PickerOption(Icons.Outlined.FolderOpen, "File", "Runs when a matching file appears in a folder") {
+                            dialog = EditorDialog.File
+                        },
+                        PickerOption(Icons.Outlined.NotificationsActive, "Notification", "Runs when another app posts a notification") {
+                            dialog = EditorDialog.NotificationTrigger
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Device",
+                    listOf(
+                        PickerOption(Icons.Outlined.BatteryAlert, "Battery", "Runs when the level crosses a threshold") {
+                            dialog = EditorDialog.BatteryTrigger
+                        },
+                        PickerOption(Icons.Outlined.Bolt, "Charging", "Runs when charging starts or stops") {
+                            dialog = EditorDialog.ChargingTrigger
+                        },
+                        PickerOption(Icons.Outlined.Smartphone, "Screen", "Runs when the screen turns on or off") {
+                            dialog = EditorDialog.ScreenTrigger
+                        },
+                        PickerOption(Icons.Outlined.Headset, "Headset", "Runs when an audio device connects") {
+                            dialog = EditorDialog.HeadsetTrigger
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Connectivity",
+                    listOf(
+                        PickerOption(Icons.Outlined.Wifi, "Wi-Fi", "Runs on Wi-Fi connect/disconnect") {
+                            dialog = EditorDialog.WiFiTrigger
+                        },
+                        PickerOption(Icons.Outlined.NetworkCheck, "Network", "Runs when internet comes or goes") {
+                            dialog = EditorDialog.NetworkTrigger
+                        },
+                        PickerOption(Icons.Outlined.Bluetooth, "Bluetooth", "Runs when a Bluetooth device connects") {
+                            dialog = EditorDialog.BluetoothTrigger
+                        }
+                    )
+                ),
+                PickerSection(
+                    "System",
+                    listOf(
+                        PickerOption(Icons.Outlined.RestartAlt, "Device boot", "Runs after the phone restarts") {
+                            viewModel.setTrigger(Trigger.DeviceBootTrigger)
+                        }
+                    )
+                )
             ),
             onDismiss = { sheet = null }
         )
 
-        EditorSheet.CONDITION -> PickerSheet(
+        EditorSheet.CONDITION -> SectionedPickerSheet(
             title = "Add condition",
-            options = listOf(
-                PickerOption(Icons.Outlined.CheckCircle, "Always", "Run every time") {
-                    viewModel.addCondition(Condition.AlwaysCondition)
-                },
-                PickerOption(Icons.Outlined.Extension, "File extension", "Only files with a given extension") {
-                    dialog = EditorDialog.FileExtension
-                },
-                PickerOption(Icons.Outlined.Search, "File name contains", "Only files whose name has a text") {
-                    dialog = EditorDialog.FileNameContains
-                },
-                PickerOption(Icons.Outlined.Straighten, "File size", "Only files above/below a size") {
-                    dialog = EditorDialog.FileSize
-                },
-                PickerOption(Icons.Outlined.Apps, "Notification app", "Only notifications from a specific app") {
-                    dialog = EditorDialog.NotificationApp
-                },
-                PickerOption(Icons.Outlined.Title, "Notification title", "Only notifications whose title matches") {
-                    dialog = EditorDialog.NotificationTitle
-                },
-                PickerOption(Icons.Outlined.Notifications, "Notification text", "Only notifications whose text matches") {
-                    dialog = EditorDialog.NotificationText
-                },
-                PickerOption(Icons.Outlined.Category, "Notification category", "Only notifications with an Android category") {
-                    dialog = EditorDialog.NotificationCategory
-                }
+            sections = listOf(
+                PickerSection(
+                    "General",
+                    listOf(
+                        PickerOption(Icons.Outlined.CheckCircle, "Always", "Run every time") {
+                            viewModel.addCondition(Condition.AlwaysCondition)
+                        }
+                    )
+                ),
+                PickerSection(
+                    "File",
+                    listOf(
+                        PickerOption(Icons.Outlined.Extension, "File extension", "Only files with a given extension") {
+                            dialog = EditorDialog.FileExtension
+                        },
+                        PickerOption(Icons.Outlined.Search, "File name contains", "Only files whose name has a text") {
+                            dialog = EditorDialog.FileNameContains
+                        },
+                        PickerOption(Icons.Outlined.Straighten, "File size", "Only files above/below a size") {
+                            dialog = EditorDialog.FileSize
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Notification",
+                    listOf(
+                        PickerOption(Icons.Outlined.Apps, "Notification app", "Only notifications from a specific app") {
+                            dialog = EditorDialog.NotificationApp
+                        },
+                        PickerOption(Icons.Outlined.Title, "Notification title", "Only notifications whose title matches") {
+                            dialog = EditorDialog.NotificationTitle
+                        },
+                        PickerOption(Icons.Outlined.Notifications, "Notification text", "Only notifications whose text matches") {
+                            dialog = EditorDialog.NotificationText
+                        },
+                        PickerOption(Icons.Outlined.Category, "Notification category", "Only notifications with an Android category") {
+                            dialog = EditorDialog.NotificationCategory
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Device",
+                    listOf(
+                        PickerOption(Icons.Outlined.BatteryAlert, "Battery level", "Only when battery is above/below a level") {
+                            dialog = EditorDialog.BatteryCondition
+                        },
+                        PickerOption(Icons.Outlined.Bolt, "Charging", "Only while charging (or not)") {
+                            dialog = EditorDialog.ChargingCondition
+                        },
+                        PickerOption(Icons.Outlined.Smartphone, "Screen", "Only while the screen is on/off") {
+                            dialog = EditorDialog.ScreenCondition
+                        }
+                    )
+                ),
+                PickerSection(
+                    "Connectivity",
+                    listOf(
+                        PickerOption(Icons.Outlined.NetworkCheck, "Network", "Only when internet is available/unavailable") {
+                            dialog = EditorDialog.NetworkCondition
+                        },
+                        PickerOption(Icons.Outlined.Wifi, "Wi-Fi", "Only when connected to Wi-Fi") {
+                            dialog = EditorDialog.WiFiCondition
+                        },
+                        PickerOption(Icons.Outlined.Bluetooth, "Bluetooth device", "Only while a device is connected") {
+                            dialog = EditorDialog.BluetoothCondition
+                        }
+                    )
+                )
             ),
             onDismiss = { sheet = null }
         )
@@ -402,6 +522,78 @@ fun AutomationEditorScreen(
                 viewModel.setTrigger(trigger)
                 dialog = null
             }
+        )
+
+        is EditorDialog.BatteryTrigger -> BatteryLevelTriggerDialog(
+            initial = state.trigger as? Trigger.BatteryLevelTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.ChargingTrigger -> ChargingTriggerDialog(
+            initial = state.trigger as? Trigger.ChargingStateTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.WiFiTrigger -> WiFiTriggerDialog(
+            initial = state.trigger as? Trigger.WiFiConnectionTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.NetworkTrigger -> NetworkTriggerDialog(
+            initial = state.trigger as? Trigger.NetworkAvailabilityTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.BluetoothTrigger -> BluetoothTriggerDialog(
+            initial = state.trigger as? Trigger.BluetoothConnectionTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.ScreenTrigger -> ScreenTriggerDialog(
+            initial = state.trigger as? Trigger.ScreenStateTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.HeadsetTrigger -> HeadsetTriggerDialog(
+            initial = state.trigger as? Trigger.HeadsetConnectionTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger -> viewModel.setTrigger(trigger); dialog = null }
+        )
+
+        is EditorDialog.BatteryCondition -> BatteryLevelConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
+        )
+
+        is EditorDialog.ChargingCondition -> ChargingConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
+        )
+
+        is EditorDialog.NetworkCondition -> NetworkConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
+        )
+
+        is EditorDialog.WiFiCondition -> WiFiConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
+        )
+
+        is EditorDialog.ScreenCondition -> ScreenConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
+        )
+
+        is EditorDialog.BluetoothCondition -> BluetoothConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition -> viewModel.addCondition(condition); dialog = null }
         )
 
         is EditorDialog.NotificationApp -> NotificationAppConditionDialog(
@@ -592,47 +784,74 @@ private data class PickerOption(
     val onSelect: () -> Unit
 )
 
-@OptIn(ExperimentalMaterial3Api::class)
+/** A titled group of picker options; null title renders options ungrouped. */
+private data class PickerSection(
+    val title: String?,
+    val options: List<PickerOption>
+)
+
 @Composable
 private fun PickerSheet(
     title: String,
     options: List<PickerOption>,
+    onDismiss: () -> Unit
+) = SectionedPickerSheet(title, listOf(PickerSection(null, options)), onDismiss)
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SectionedPickerSheet(
+    title: String,
+    sections: List<PickerSection>,
     onDismiss: () -> Unit
 ) {
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
-        Column(modifier = Modifier.padding(bottom = 24.dp)) {
+        Column(
+            modifier = Modifier
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = 24.dp)
+        ) {
             Text(
                 text = title,
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)
             )
-            options.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable {
-                            option.onSelect()
-                            onDismiss()
-                        }
-                        .padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = option.icon,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
+            sections.forEach { section ->
+                if (section.title != null) {
+                    Text(
+                        text = section.title.uppercase(),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.padding(start = 24.dp, top = 14.dp, bottom = 2.dp)
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column {
-                        Text(text = option.title, style = MaterialTheme.typography.titleSmall)
-                        Text(
-                            text = option.description,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                }
+                section.options.forEach { option ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                option.onSelect()
+                                onDismiss()
+                            }
+                            .padding(horizontal = 24.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = option.icon,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
                         )
+                        Spacer(modifier = Modifier.width(16.dp))
+                        Column {
+                            Text(text = option.title, style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                text = option.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                     }
                 }
             }

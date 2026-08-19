@@ -2,6 +2,8 @@ package com.dhruw.autoflow.data.local.converters
 
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
+import com.dhruw.autoflow.automation.model.ConnectionEvent
+import com.dhruw.autoflow.automation.model.LevelComparison
 import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
 import org.junit.Assert.assertEquals
@@ -162,5 +164,45 @@ class WorkflowJsonTest {
     fun `save notification action round-trips`() {
         val actions = listOf<Action>(Action.SaveNotificationAction)
         assertEquals(actions, WorkflowJson.decodeActions(WorkflowJson.encodeActions(actions)))
+    }
+
+    @Test
+    fun `system triggers round-trip`() {
+        val triggers = listOf(
+            Trigger.BatteryLevelTrigger(LevelComparison.LESS_OR_EQUAL, 20),
+            Trigger.ChargingStateTrigger(onCharging = true),
+            Trigger.ChargingStateTrigger(onCharging = false),
+            Trigger.WiFiConnectionTrigger(ConnectionEvent.CONNECTED, "Home"),
+            Trigger.WiFiConnectionTrigger(ConnectionEvent.DISCONNECTED),
+            Trigger.NetworkAvailabilityTrigger(onAvailable = false),
+            Trigger.BluetoothConnectionTrigger(ConnectionEvent.CONNECTED, "AA:BB:CC:DD:EE:FF", "Car"),
+            Trigger.BluetoothConnectionTrigger(ConnectionEvent.DISCONNECTED),
+            Trigger.ScreenStateTrigger(onScreenOn = true),
+            Trigger.HeadsetConnectionTrigger(ConnectionEvent.CONNECTED),
+            Trigger.DeviceBootTrigger
+        )
+        triggers.forEach { trigger ->
+            assertEquals(trigger, WorkflowJson.decodeTrigger(WorkflowJson.encodeTrigger(trigger)))
+        }
+    }
+
+    @Test
+    fun `system conditions round-trip`() {
+        val conditions = listOf<Condition>(
+            Condition.BatteryLevelCondition(LevelComparison.LESS_THAN, 30),
+            Condition.IsChargingCondition(charging = false),
+            Condition.NetworkAvailableCondition(available = true),
+            Condition.WiFiConnectedCondition("Home"),
+            Condition.WiFiConnectedCondition(),
+            Condition.ScreenOnCondition(on = false),
+            Condition.BluetoothConnectedCondition("AA:BB:CC:DD:EE:FF", "Car"),
+            Condition.AndCondition(
+                listOf(
+                    Condition.BatteryLevelCondition(LevelComparison.LESS_THAN, 20),
+                    Condition.NotCondition(Condition.IsChargingCondition(charging = true))
+                )
+            )
+        )
+        assertEquals(conditions, WorkflowJson.decodeConditions(WorkflowJson.encodeConditions(conditions)))
     }
 }
