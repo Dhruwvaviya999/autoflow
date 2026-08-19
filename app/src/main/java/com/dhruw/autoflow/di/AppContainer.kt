@@ -24,8 +24,14 @@ import com.dhruw.autoflow.services.files.MoveFileActionHandler
 import com.dhruw.autoflow.services.files.RenameFileActionHandler
 import com.dhruw.autoflow.services.files.SafFileAccess
 import com.dhruw.autoflow.services.files.WorkManagerFileMonitor
+import com.dhruw.autoflow.automation.engine.AutomationEventDispatcher
+import com.dhruw.autoflow.data.repository.NotificationRecordRepository
+import com.dhruw.autoflow.data.repository.RoomNotificationRecordRepository
 import com.dhruw.autoflow.services.instagram.InstagramAnalysisActionHandler
 import com.dhruw.autoflow.services.notification.AutomationNotifier
+import com.dhruw.autoflow.services.notification.InstalledApps
+import com.dhruw.autoflow.services.notification.NotificationAccessManager
+import com.dhruw.autoflow.services.notification.SaveNotificationActionHandler
 import com.dhruw.autoflow.services.notification.ShowNotificationActionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +53,14 @@ class AppContainer(context: Context) {
     val executionRepository: ExecutionRepository =
         RoomExecutionRepository(database.executionDao(), applicationScope)
 
+    val notificationRecordRepository: NotificationRecordRepository =
+        RoomNotificationRecordRepository(database.notificationRecordDao())
+
     private val notifier = AutomationNotifier(appContext)
+
+    val installedApps = InstalledApps(appContext)
+
+    val notificationAccessManager = NotificationAccessManager(appContext)
 
     val fileAccess: FileAccess = SafFileAccess(appContext)
 
@@ -75,11 +88,15 @@ class AppContainer(context: Context) {
                 analyzer = instagramAnalyzer,
                 store = instagramAnalysisStore,
                 notifier = notifier
-            )
+            ),
+            SaveNotificationActionHandler(notificationRecordRepository)
         )
     )
 
     val runner = AutomationRunner(engine, automationRepository, executionRepository)
+
+    /** Push-style trigger events (notifications) enter the engine through here. */
+    val eventDispatcher = AutomationEventDispatcher(automationRepository, runner)
 
     val scheduler: AutomationScheduler =
         WorkManagerAutomationScheduler(appContext, fileMonitor)

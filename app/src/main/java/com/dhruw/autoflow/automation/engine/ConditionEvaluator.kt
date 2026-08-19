@@ -5,17 +5,18 @@ import com.dhruw.autoflow.automation.model.TriggerPayload
 import java.util.Locale
 
 /**
- * Evaluates a condition tree. Composite conditions (And/Or/Not) get new
- * recursive branches here when they are introduced.
+ * Evaluates a condition tree, recursing through And/Or/Not composites.
  *
- * File conditions need the run's [TriggerPayload.FileEvent]; without one
- * they fail, which turns the run into a SKIPPED execution rather than a
- * crash or a blind pass.
+ * File conditions need the run's [TriggerPayload.FileEvent] and notification
+ * conditions the run's [TriggerPayload.NotificationEvent]; without the right
+ * payload they fail, which turns the run into a SKIPPED execution rather
+ * than a crash or a blind pass.
  */
 open class ConditionEvaluator {
 
     open fun evaluate(condition: Condition, payload: TriggerPayload? = null): Boolean {
         val file = payload as? TriggerPayload.FileEvent
+        val notification = payload as? TriggerPayload.NotificationEvent
         return when (condition) {
             is Condition.AlwaysCondition -> true
             is Condition.FileExtensionCondition ->
@@ -33,6 +34,25 @@ open class ConditionEvaluator {
                 Condition.FileSizeCondition.Comparison.GREATER_THAN ->
                     file.sizeBytes > condition.sizeBytes
             }
+            is Condition.NotificationAppCondition ->
+                notification != null &&
+                    condition.packageName.isNotBlank() &&
+                    notification.packageName.equals(condition.packageName.trim(), ignoreCase = true)
+            is Condition.NotificationTitleCondition ->
+                notification != null &&
+                    condition.value.isNotBlank() &&
+                    condition.mode.matches(notification.title, condition.value)
+            is Condition.NotificationTextCondition ->
+                notification != null &&
+                    condition.value.isNotBlank() &&
+                    condition.mode.matches(notification.text, condition.value)
+            is Condition.NotificationCategoryCondition ->
+                notification != null &&
+                    condition.category.isNotBlank() &&
+                    notification.category.equals(condition.category.trim(), ignoreCase = true)
+            is Condition.AndCondition -> condition.conditions.all { evaluate(it, payload) }
+            is Condition.OrCondition -> condition.conditions.any { evaluate(it, payload) }
+            is Condition.NotCondition -> !evaluate(condition.condition, payload)
         }
     }
 

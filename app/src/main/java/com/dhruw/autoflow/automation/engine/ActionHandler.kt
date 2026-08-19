@@ -8,11 +8,16 @@ class ActionExecutionException(message: String, cause: Throwable? = null) :
 
 /**
  * Passed to handlers; [log] lines end up in the execution's history entry.
- * [fileEvent] is set when the run was started by a file trigger.
+ * [fileEvent] is set when the run was started by a file trigger,
+ * [notificationEvent] when it was started by a notification trigger.
+ * [automationId] identifies the automation being run (used by handlers that
+ * persist per-automation data).
  */
 class ActionContext(
     val log: (String) -> Unit,
-    val fileEvent: com.dhruw.autoflow.automation.model.TriggerPayload.FileEvent? = null
+    val fileEvent: com.dhruw.autoflow.automation.model.TriggerPayload.FileEvent? = null,
+    val notificationEvent: com.dhruw.autoflow.automation.model.TriggerPayload.NotificationEvent? = null,
+    val automationId: String? = null
 )
 
 /**

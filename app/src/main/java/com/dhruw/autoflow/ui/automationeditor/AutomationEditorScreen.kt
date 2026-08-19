@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
@@ -30,10 +32,13 @@ import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Straighten
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -77,9 +82,14 @@ private sealed interface EditorDialog {
     data class Log(val index: Int?) : EditorDialog
     data object Time : EditorDialog
     data object File : EditorDialog
+    data object NotificationTrigger : EditorDialog
     data object FileExtension : EditorDialog
     data object FileNameContains : EditorDialog
     data object FileSize : EditorDialog
+    data object NotificationApp : EditorDialog
+    data object NotificationTitle : EditorDialog
+    data object NotificationText : EditorDialog
+    data object NotificationCategory : EditorDialog
     data class CopyFile(val index: Int?) : EditorDialog
     data class MoveFile(val index: Int?) : EditorDialog
     data class RenameFile(val index: Int?) : EditorDialog
@@ -189,6 +199,8 @@ fun AutomationEditorScreen(
                         when (trigger) {
                             is Trigger.TimeTrigger -> dialog = EditorDialog.Time
                             is Trigger.FileTrigger -> dialog = EditorDialog.File
+                            is Trigger.NotificationTrigger ->
+                                dialog = EditorDialog.NotificationTrigger
                             else -> sheet = EditorSheet.TRIGGER
                         }
                     },
@@ -227,6 +239,7 @@ fun AutomationEditorScreen(
                             is Action.MoveFileAction -> EditorDialog.MoveFile(index)
                             is Action.RenameFileAction -> EditorDialog.RenameFile(index)
                             is Action.InstagramAnalysisAction -> null
+                            is Action.SaveNotificationAction -> null
                         }
                     },
                     onDelete = { viewModel.removeAction(index) }
@@ -259,6 +272,9 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.FolderOpen, "File", "Runs when a matching file appears in a folder") {
                     dialog = EditorDialog.File
+                },
+                PickerOption(Icons.Outlined.NotificationsActive, "Notification", "Runs when another app posts a notification") {
+                    dialog = EditorDialog.NotificationTrigger
                 }
             ),
             onDismiss = { sheet = null }
@@ -278,6 +294,18 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.Straighten, "File size", "Only files above/below a size") {
                     dialog = EditorDialog.FileSize
+                },
+                PickerOption(Icons.Outlined.Apps, "Notification app", "Only notifications from a specific app") {
+                    dialog = EditorDialog.NotificationApp
+                },
+                PickerOption(Icons.Outlined.Title, "Notification title", "Only notifications whose title matches") {
+                    dialog = EditorDialog.NotificationTitle
+                },
+                PickerOption(Icons.Outlined.Notifications, "Notification text", "Only notifications whose text matches") {
+                    dialog = EditorDialog.NotificationText
+                },
+                PickerOption(Icons.Outlined.Category, "Notification category", "Only notifications with an Android category") {
+                    dialog = EditorDialog.NotificationCategory
                 }
             ),
             onDismiss = { sheet = null }
@@ -306,6 +334,9 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.PersonSearch, "Instagram analysis", "Find who doesn't follow back from an export file") {
                     viewModel.addAction(Action.InstagramAnalysisAction)
+                },
+                PickerOption(Icons.Outlined.Save, "Save notification", "Keep the triggering notification on this device") {
+                    viewModel.addAction(Action.SaveNotificationAction)
                 }
             ),
             onDismiss = { sheet = null }
@@ -360,6 +391,49 @@ fun AutomationEditorScreen(
             onDismiss = { dialog = null },
             onConfirm = { trigger ->
                 viewModel.setTrigger(trigger)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.NotificationTrigger -> NotificationTriggerDialog(
+            initial = state.trigger as? Trigger.NotificationTrigger,
+            onDismiss = { dialog = null },
+            onConfirm = { trigger ->
+                viewModel.setTrigger(trigger)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.NotificationApp -> NotificationAppConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition ->
+                viewModel.addCondition(condition)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.NotificationTitle -> NotificationTextMatchConditionDialog(
+            isTitle = true,
+            onDismiss = { dialog = null },
+            onConfirm = { condition ->
+                viewModel.addCondition(condition)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.NotificationText -> NotificationTextMatchConditionDialog(
+            isTitle = false,
+            onDismiss = { dialog = null },
+            onConfirm = { condition ->
+                viewModel.addCondition(condition)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.NotificationCategory -> NotificationCategoryConditionDialog(
+            onDismiss = { dialog = null },
+            onConfirm = { condition ->
+                viewModel.addCondition(condition)
                 dialog = null
             }
         )

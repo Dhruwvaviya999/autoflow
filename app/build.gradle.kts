@@ -34,10 +34,29 @@ android {
     buildFeatures {
         compose = true
     }
+    sourceSets {
+        // Exported Room schemas as test assets so MigrationTestHelper can
+        // create old-version databases and validate migrations.
+        getByName("androidTest") {
+            assets.srcDir("$projectDir/schemas")
+        }
+    }
 }
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
+}
+
+// room-testing 2.8.x needs kotlinx-serialization 1.8+, but androidx.navigation
+// strictly pins core to 1.7.3, causing AbstractMethodError when the migration
+// test parses schema JSON. Force a consistent modern version for tests only.
+configurations.matching { it.name.contains("AndroidTest") }.configureEach {
+    resolutionStrategy {
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.9.0")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.9.0")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.9.0")
+    }
 }
 
 dependencies {
@@ -66,6 +85,10 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.room.testing)
+    // room-testing parses exported schema JSON with kotlinx-serialization;
+    // pin a runtime matching its compiled-against API to avoid
+    // AbstractMethodError from an older transitive core.
+    androidTestImplementation(libs.kotlinx.serialization.json)
     androidTestImplementation(libs.androidx.work.testing)
     androidTestImplementation(libs.kotlinx.coroutines.test)
     debugImplementation(libs.androidx.compose.ui.test.manifest)

@@ -3,7 +3,11 @@ package com.dhruw.autoflow.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.outlined.AccountTree
+import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Cancel
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Extension
@@ -11,12 +15,15 @@ import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.SkipNext
 import androidx.compose.material.icons.outlined.Straighten
 import androidx.compose.material.icons.outlined.Sync
+import androidx.compose.material.icons.outlined.Title
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +42,7 @@ val Trigger.icon: ImageVector
         is Trigger.ManualTrigger -> Icons.Outlined.TouchApp
         is Trigger.TimeTrigger -> Icons.Outlined.Schedule
         is Trigger.FileTrigger -> Icons.Outlined.FolderOpen
+        is Trigger.NotificationTrigger -> Icons.Outlined.NotificationsActive
     }
 
 val Condition.icon: ImageVector
@@ -43,6 +51,13 @@ val Condition.icon: ImageVector
         is Condition.FileExtensionCondition -> Icons.Outlined.Extension
         is Condition.FileNameContainsCondition -> Icons.Outlined.Search
         is Condition.FileSizeCondition -> Icons.Outlined.Straighten
+        is Condition.NotificationAppCondition -> Icons.Outlined.Apps
+        is Condition.NotificationTitleCondition -> Icons.Outlined.Title
+        is Condition.NotificationTextCondition -> Icons.Outlined.Notifications
+        is Condition.NotificationCategoryCondition -> Icons.Outlined.Category
+        is Condition.AndCondition -> Icons.Outlined.AccountTree
+        is Condition.OrCondition -> Icons.Outlined.AccountTree
+        is Condition.NotCondition -> Icons.Outlined.Block
     }
 
 val Action.icon: ImageVector
@@ -54,6 +69,7 @@ val Action.icon: ImageVector
         is Action.MoveFileAction -> Icons.AutoMirrored.Outlined.DriveFileMove
         is Action.RenameFileAction -> Icons.Outlined.DriveFileRenameOutline
         is Action.InstagramAnalysisAction -> Icons.Outlined.PersonSearch
+        is Action.SaveNotificationAction -> Icons.Outlined.Save
     }
 
 val ExecutionStatus.icon: ImageVector

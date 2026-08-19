@@ -2,6 +2,7 @@ package com.dhruw.autoflow.data.local.converters
 
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
+import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -111,5 +112,55 @@ class WorkflowJsonTest {
         assertThrows(WorkflowJsonException::class.java) {
             WorkflowJson.decodeTrigger("""{"type":"time","hour":8,"minute":0,"repeat":"WEEKLY"}""")
         }
+    }
+
+    @Test
+    fun `notification trigger round-trips`() {
+        val anyApp = Trigger.NotificationTrigger()
+        assertEquals(anyApp, WorkflowJson.decodeTrigger(WorkflowJson.encodeTrigger(anyApp)))
+
+        val specific = Trigger.NotificationTrigger(
+            allowedPackages = setOf("com.whatsapp"),
+            appLabel = "WhatsApp",
+            titlePattern = "Interview",
+            textPattern = "job opening",
+            matchMode = TextMatchMode.STARTS_WITH
+        )
+        assertEquals(specific, WorkflowJson.decodeTrigger(WorkflowJson.encodeTrigger(specific)))
+    }
+
+    @Test
+    fun `notification conditions round-trip`() {
+        val conditions = listOf(
+            Condition.NotificationAppCondition("com.whatsapp", "WhatsApp"),
+            Condition.NotificationTitleCondition("Interview", TextMatchMode.EQUALS),
+            Condition.NotificationTextCondition("job opening"),
+            Condition.NotificationCategoryCondition("msg")
+        )
+        assertEquals(conditions, WorkflowJson.decodeConditions(WorkflowJson.encodeConditions(conditions)))
+    }
+
+    @Test
+    fun `composite conditions round-trip nested`() {
+        val conditions = listOf<Condition>(
+            Condition.AndCondition(
+                listOf(
+                    Condition.NotificationAppCondition("com.whatsapp"),
+                    Condition.OrCondition(
+                        listOf(
+                            Condition.NotificationTextCondition("job"),
+                            Condition.NotCondition(Condition.NotificationTextCondition("spam"))
+                        )
+                    )
+                )
+            )
+        )
+        assertEquals(conditions, WorkflowJson.decodeConditions(WorkflowJson.encodeConditions(conditions)))
+    }
+
+    @Test
+    fun `save notification action round-trips`() {
+        val actions = listOf<Action>(Action.SaveNotificationAction)
+        assertEquals(actions, WorkflowJson.decodeActions(WorkflowJson.encodeActions(actions)))
     }
 }

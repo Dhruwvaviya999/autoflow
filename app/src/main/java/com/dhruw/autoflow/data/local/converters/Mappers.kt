@@ -3,8 +3,10 @@ package com.dhruw.autoflow.data.local.converters
 import com.dhruw.autoflow.automation.model.Automation
 import com.dhruw.autoflow.automation.model.Execution
 import com.dhruw.autoflow.automation.model.ExecutionStatus
+import com.dhruw.autoflow.automation.model.NotificationRecord
 import com.dhruw.autoflow.data.local.entity.AutomationEntity
 import com.dhruw.autoflow.data.local.entity.ExecutionEntity
+import com.dhruw.autoflow.data.local.entity.NotificationRecordEntity
 
 fun Automation.toEntity(): AutomationEntity = AutomationEntity(
     id = id,
@@ -66,4 +68,24 @@ fun ExecutionEntity.toDomain(): Execution = Execution(
     message = message,
     error = error,
     logs = WorkflowJson.decodeLogs(logsJson)
+)
+
+fun NotificationRecord.toEntity(): NotificationRecordEntity = NotificationRecordEntity(
+    id = id,
+    packageName = packageName,
+    appName = appName,
+    title = title,
+    text = text,
+    timestamp = timestamp,
+    automationId = automationId
+)
+
+fun NotificationRecordEntity.toDomain(): NotificationRecord = NotificationRecord(
+    id = id,
+    packageName = packageName,
+    appName = appName,
+    title = title,
+    text = text,
+    timestamp = timestamp,
+    automationId = automationId
 )

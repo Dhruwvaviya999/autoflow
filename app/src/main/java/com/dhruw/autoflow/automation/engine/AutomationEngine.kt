@@ -72,7 +72,9 @@ class AutomationEngine(
 
         val context = ActionContext(
             log = { line -> logs += line },
-            fileEvent = payload as? TriggerPayload.FileEvent
+            fileEvent = payload as? TriggerPayload.FileEvent,
+            notificationEvent = payload as? TriggerPayload.NotificationEvent,
+            automationId = automation.id
         )
 
         try {

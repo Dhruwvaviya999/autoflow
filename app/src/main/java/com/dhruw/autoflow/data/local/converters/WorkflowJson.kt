@@ -2,6 +2,7 @@ package com.dhruw.autoflow.data.local.converters
 
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
+import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
 import org.json.JSONArray
 import org.json.JSONException
@@ -24,10 +25,18 @@ object WorkflowJson {
     private const val TRIGGER_MANUAL = "manual"
     private const val TRIGGER_TIME = "time"
     private const val TRIGGER_FILE = "file"
+    private const val TRIGGER_NOTIFICATION = "notification"
     private const val CONDITION_ALWAYS = "always"
     private const val CONDITION_FILE_EXTENSION = "file_extension"
     private const val CONDITION_FILE_NAME_CONTAINS = "file_name_contains"
     private const val CONDITION_FILE_SIZE = "file_size"
+    private const val CONDITION_NOTIFICATION_APP = "notification_app"
+    private const val CONDITION_NOTIFICATION_TITLE = "notification_title"
+    private const val CONDITION_NOTIFICATION_TEXT = "notification_text"
+    private const val CONDITION_NOTIFICATION_CATEGORY = "notification_category"
+    private const val CONDITION_AND = "and"
+    private const val CONDITION_OR = "or"
+    private const val CONDITION_NOT = "not"
     private const val ACTION_SHOW_NOTIFICATION = "show_notification"
     private const val ACTION_DELAY = "delay"
     private const val ACTION_LOG = "log"
@@ -35,6 +44,7 @@ object WorkflowJson {
     private const val ACTION_MOVE_FILE = "move_file"
     private const val ACTION_RENAME_FILE = "rename_file"
     private const val ACTION_INSTAGRAM_ANALYSIS = "instagram_analysis"
+    private const val ACTION_SAVE_NOTIFICATION = "save_notification"
 
     // --- Trigger ---
 
@@ -54,6 +64,15 @@ object WorkflowJson {
                 namePattern = json.optString("namePattern", ""),
                 extension = json.optString("extension", "")
             )
+            TRIGGER_NOTIFICATION -> Trigger.NotificationTrigger(
+                allowedPackages = json.getJSONArray("allowedPackages").let { arr ->
+                    List(arr.length()) { arr.getString(it) }.toSet()
+                },
+                appLabel = json.optString("appLabel", ""),
+                titlePattern = json.optString("titlePattern", ""),
+                textPattern = json.optString("textPattern", ""),
+                matchMode = TextMatchMode.valueOf(json.optString("matchMode", TextMatchMode.CONTAINS.name))
+            )
             else -> throw WorkflowJsonException("Unknown trigger type: $type")
         }
     }
@@ -71,6 +90,13 @@ object WorkflowJson {
             .put("folderLabel", trigger.folderLabel)
             .put("namePattern", trigger.namePattern)
             .put("extension", trigger.extension)
+        is Trigger.NotificationTrigger -> JSONObject()
+            .put(KEY_TYPE, TRIGGER_NOTIFICATION)
+            .put("allowedPackages", JSONArray(trigger.allowedPackages))
+            .put("appLabel", trigger.appLabel)
+            .put("titlePattern", trigger.titlePattern)
+            .put("textPattern", trigger.textPattern)
+            .put("matchMode", trigger.matchMode.name)
     }
 
     // --- Conditions ---
@@ -78,7 +104,9 @@ object WorkflowJson {
     fun encodeConditions(conditions: List<Condition>): String =
         JSONArray(conditions.map(::conditionToJson)).toString()
 
-    fun decodeConditions(raw: String): List<Condition> = parseArray(raw) { json ->
+    fun decodeConditions(raw: String): List<Condition> = parseArray(raw, ::decodeCondition)
+
+    private fun decodeCondition(json: JSONObject): Condition =
         when (val type = json.getString(KEY_TYPE)) {
             CONDITION_ALWAYS -> Condition.AlwaysCondition
             CONDITION_FILE_EXTENSION ->
@@ -89,9 +117,36 @@ object WorkflowJson {
                 comparison = Condition.FileSizeCondition.Comparison.valueOf(json.getString("comparison")),
                 sizeBytes = json.getLong("sizeBytes")
             )
+            CONDITION_NOTIFICATION_APP -> Condition.NotificationAppCondition(
+                packageName = json.getString("packageName"),
+                appLabel = json.optString("appLabel", "")
+            )
+            CONDITION_NOTIFICATION_TITLE -> Condition.NotificationTitleCondition(
+                value = json.getString("value"),
+                mode = TextMatchMode.valueOf(json.optString("mode", TextMatchMode.CONTAINS.name))
+            )
+            CONDITION_NOTIFICATION_TEXT -> Condition.NotificationTextCondition(
+                value = json.getString("value"),
+                mode = TextMatchMode.valueOf(json.optString("mode", TextMatchMode.CONTAINS.name))
+            )
+            CONDITION_NOTIFICATION_CATEGORY -> Condition.NotificationCategoryCondition(
+                category = json.getString("category")
+            )
+            CONDITION_AND -> Condition.AndCondition(
+                conditions = json.getJSONArray("conditions").let { arr ->
+                    List(arr.length()) { decodeCondition(arr.getJSONObject(it)) }
+                }
+            )
+            CONDITION_OR -> Condition.OrCondition(
+                conditions = json.getJSONArray("conditions").let { arr ->
+                    List(arr.length()) { decodeCondition(arr.getJSONObject(it)) }
+                }
+            )
+            CONDITION_NOT -> Condition.NotCondition(
+                condition = decodeCondition(json.getJSONObject("condition"))
+            )
             else -> throw WorkflowJsonException("Unknown condition type: $type")
         }
-    }
 
     private fun conditionToJson(condition: Condition): JSONObject = when (condition) {
         is Condition.AlwaysCondition -> JSONObject().put(KEY_TYPE, CONDITION_ALWAYS)
@@ -105,6 +160,30 @@ object WorkflowJson {
             .put(KEY_TYPE, CONDITION_FILE_SIZE)
             .put("comparison", condition.comparison.name)
             .put("sizeBytes", condition.sizeBytes)
+        is Condition.NotificationAppCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NOTIFICATION_APP)
+            .put("packageName", condition.packageName)
+            .put("appLabel", condition.appLabel)
+        is Condition.NotificationTitleCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NOTIFICATION_TITLE)
+            .put("value", condition.value)
+            .put("mode", condition.mode.name)
+        is Condition.NotificationTextCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NOTIFICATION_TEXT)
+            .put("value", condition.value)
+            .put("mode", condition.mode.name)
+        is Condition.NotificationCategoryCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NOTIFICATION_CATEGORY)
+            .put("category", condition.category)
+        is Condition.AndCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_AND)
+            .put("conditions", JSONArray(condition.conditions.map(::conditionToJson)))
+        is Condition.OrCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_OR)
+            .put("conditions", JSONArray(condition.conditions.map(::conditionToJson)))
+        is Condition.NotCondition -> JSONObject()
+            .put(KEY_TYPE, CONDITION_NOT)
+            .put("condition", conditionToJson(condition.condition))
     }
 
     // --- Actions ---
@@ -130,6 +209,7 @@ object WorkflowJson {
             )
             ACTION_RENAME_FILE -> Action.RenameFileAction(newName = json.getString("newName"))
             ACTION_INSTAGRAM_ANALYSIS -> Action.InstagramAnalysisAction
+            ACTION_SAVE_NOTIFICATION -> Action.SaveNotificationAction
             else -> throw WorkflowJsonException("Unknown action type: $type")
         }
     }
@@ -158,6 +238,8 @@ object WorkflowJson {
             .put("newName", action.newName)
         is Action.InstagramAnalysisAction -> JSONObject()
             .put(KEY_TYPE, ACTION_INSTAGRAM_ANALYSIS)
+        is Action.SaveNotificationAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_SAVE_NOTIFICATION)
     }
 
     // --- Log lines (not polymorphic, but stored the same way) ---

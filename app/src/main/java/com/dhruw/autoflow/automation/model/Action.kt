@@ -47,6 +47,14 @@ sealed interface Action {
      * and the execution log. No credentials, no network.
      */
     data object InstagramAnalysisAction : Action
+
+    /**
+     * Store the triggering notification in the local database. Opt-in only:
+     * notifications are never persisted unless the user adds this action to
+     * an automation. Storage is capped (newest 500 records) so it cannot
+     * grow without bound.
+     */
+    data object SaveNotificationAction : Action
 }
 
 val Action.displayName: String
@@ -58,6 +66,7 @@ val Action.displayName: String
         is Action.MoveFileAction -> "Move file"
         is Action.RenameFileAction -> "Rename file"
         is Action.InstagramAnalysisAction -> "Instagram analysis"
+        is Action.SaveNotificationAction -> "Save notification"
     }
 
 val Action.summary: String
@@ -72,4 +81,5 @@ val Action.summary: String
         is Action.MoveFileAction -> "Move to ${destinationLabel.ifBlank { "selected folder" }}"
         is Action.RenameFileAction -> "Rename to \"${newName.trim()}\""
         is Action.InstagramAnalysisAction -> "Find who doesn't follow back"
+        is Action.SaveNotificationAction -> "Keep the notification on this device"
     }

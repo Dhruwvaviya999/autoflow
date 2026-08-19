@@ -27,7 +27,9 @@ import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.DarkMode
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material3.HorizontalDivider
@@ -49,6 +51,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.dhruw.autoflow.AutoFlowApplication
+import com.dhruw.autoflow.services.notification.NotificationAccessManager
 import com.dhruw.autoflow.ui.components.SectionHeader
 
 @Composable
@@ -72,6 +76,10 @@ fun SettingsScreen(
     val notificationsAllowed = remember(refreshKey) {
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
+    val accessManager = remember {
+        (context.applicationContext as AutoFlowApplication).container.notificationAccessManager
+    }
+    val notificationAccess = remember(refreshKey) { accessManager.status() }
     val ignoringBatteryOptimizations = remember(refreshKey) {
         context.getSystemService(PowerManager::class.java)
             ?.isIgnoringBatteryOptimizations(context.packageName) == true
@@ -131,6 +139,29 @@ fun SettingsScreen(
             )
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             SettingsRow(
+                icon = Icons.Outlined.NotificationsActive,
+                title = "Notification access",
+                description = when (notificationAccess) {
+                    NotificationAccessManager.Status.GRANTED ->
+                        "Connected — notification triggers are active"
+                    NotificationAccessManager.Status.NOT_GRANTED ->
+                        "Not connected — needed only for notification triggers. Tap to grant."
+                    NotificationAccessManager.Status.UNAVAILABLE ->
+                        "Unavailable — this device blocks reading the setting"
+                },
+                statusColor = when (notificationAccess) {
+                    NotificationAccessManager.Status.GRANTED -> StatusColor.OK
+                    NotificationAccessManager.Status.NOT_GRANTED -> StatusColor.NEUTRAL
+                    NotificationAccessManager.Status.UNAVAILABLE -> StatusColor.WARN
+                },
+                onClick = if (notificationAccess == NotificationAccessManager.Status.GRANTED) {
+                    null
+                } else {
+                    { context.startActivity(accessManager.settingsIntent()) }
+                }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
                 icon = Icons.Outlined.Schedule,
                 title = "Background scheduling",
                 description = "Available — scheduled automations run near their set " +
@@ -164,6 +195,45 @@ fun SettingsScreen(
                 statusColor = StatusColor.NEUTRAL,
                 onClick = null
             )
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Privacy statement for notification access — must stay accurate:
+        // notification content is processed on-device only, nothing is
+        // uploaded. Revisit if a network action type is ever added.
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            color = MaterialTheme.colorScheme.surfaceContainerLowest,
+            border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(modifier = Modifier.padding(16.dp)) {
+                Icon(
+                    imageVector = Icons.Outlined.Lock,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "Privacy",
+                        style = MaterialTheme.typography.titleSmall
+                    )
+                    Text(
+                        text = "Notification content is processed locally on this " +
+                            "device by AutoFlow. AutoFlow does not upload " +
+                            "notification content to a server. Notifications are " +
+                            "only stored if an automation uses the Save " +
+                            "notification action. AutoFlow can only read what " +
+                            "apps put into their notifications — some apps hide " +
+                            "or shorten content.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
         }
 
         Spacer(modifier = Modifier.height(24.dp))

@@ -15,7 +15,7 @@ import com.dhruw.autoflow.data.repository.RoomExecutionRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -43,7 +43,12 @@ class RoomRepositoryTest {
 
     @After
     fun tearDown() {
-        scope.cancel()
+        // cancel() alone is fire-and-forget: the eagerly-started StateFlow
+        // collector can still be mid-query when the database closes, which
+        // intermittently fails tests with "connection is closed". Join first.
+        runBlocking {
+            scope.coroutineContext[kotlinx.coroutines.Job]?.cancelAndJoin()
+        }
         database.close()
     }
 
