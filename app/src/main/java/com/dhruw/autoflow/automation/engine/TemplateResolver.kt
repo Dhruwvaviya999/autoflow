@@ -17,7 +17,7 @@ import com.dhruw.autoflow.automation.model.TriggerPayload
  */
 object TemplateResolver {
 
-    private val TOKEN = Regex("""\{\{\s*([a-zA-Z0-9_.]+)\s*}}""")
+    private val TOKEN = Regex("""\{\{\s*([a-zA-Z0-9_.]+)\s*\}\}""")
 
     sealed interface Result {
         data class Ok(val text: String) : Result

@@ -1,11 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Deliberately minimal configuration (Phase 7):
-  - Only two event types. typeWindowStateChanged tracks the foreground
-    package for the target-package boundary; typeViewClicked feeds the
-    user-started element inspector. Element lookup during a run polls the
-    active window directly and needs no events, so high-frequency content
-    events (typeWindowContentChanged etc.) are NOT requested.
+  Minimal-but-correct configuration (Phase 7):
+  - typeWindowStateChanged tracks the foreground package for the
+    target-package boundary; typeViewClicked feeds the user-started element
+    inspector. typeWindowContentChanged and typeViewScrolled carry no logic
+    of their own (the handler ignores them), but receiving them is REQUIRED:
+    the framework's per-service accessibility node cache is invalidated by
+    delivered events, and without them rootInActiveWindow returns stale
+    trees after any scroll or in-app navigation (device-verified on
+    Android 13 — selectors stopped matching content that was on screen).
   - canRetrieveWindowContent is required to find and act on nodes.
   - flagReportViewIds exposes view IDs, the most stable selector type.
   - No canPerformGestures: interaction is semantic (ACTION_CLICK/SET_TEXT),
@@ -14,7 +17,7 @@
   - notificationTimeout throttles event delivery to keep idle overhead low.
 -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked|typeWindowContentChanged|typeViewScrolled"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews"
     android:canRetrieveWindowContent="true"

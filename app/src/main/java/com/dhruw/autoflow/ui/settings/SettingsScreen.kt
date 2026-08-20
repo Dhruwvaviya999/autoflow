@@ -52,7 +52,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.testTagsAsResourceId
 import androidx.compose.ui.unit.dp
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -63,6 +67,7 @@ import com.dhruw.autoflow.services.notification.NotificationAccessManager
 import com.dhruw.autoflow.ui.components.SectionHeader
 import com.dhruw.autoflow.ui.testlab.AccessibilityTestLabActivity
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
@@ -124,6 +129,10 @@ fun SettingsScreen(
     Column(
         modifier = modifier
             .fillMaxSize()
+            // Surfaces testTags as accessibility view IDs so ViewId
+            // selectors can target this screen (same pattern as the Test Lab).
+            .semantics { testTagsAsResourceId = true }
+            .testTag("settings_list")
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 20.dp)
     ) {

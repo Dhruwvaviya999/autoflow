@@ -82,7 +82,7 @@ class UiAutomationExecutor(
             val result = try {
                 ensureUnlocked()
                 ensureWithinDeadline(deadline)
-                if (launched && step.needsPackageGuard()) ensureOnTarget(targetPackage)
+                if (launched && step.needsPackageGuard()) ensureOnTarget(targetPackage, deadline)
                 onStepStarted(index, step)
 
                 val detail = execute(step, payload, deadline)
@@ -130,7 +130,7 @@ class UiAutomationExecutor(
         }
 
         is UiStep.ClickElement -> {
-            val node = requireOne(step.selector)
+            val node = requireOne(step.selector, deadline)
             val target = node.nearestClickable()
                 ?: fail(UiStepStatus.FAILED, "No clickable target for ${step.selector.summary}")
             if (!target.performClick()) fail(UiStepStatus.FAILED, "Tap failed on ${step.selector.summary}")
@@ -138,7 +138,7 @@ class UiAutomationExecutor(
         }
 
         is UiStep.LongClickElement -> {
-            val node = requireOne(step.selector)
+            val node = requireOne(step.selector, deadline)
             val target = node.nearestLongClickable()
                 ?: fail(UiStepStatus.FAILED, "Long press not supported for ${step.selector.summary}")
             if (!target.performLongClick()) fail(UiStepStatus.FAILED, "Long press failed")
@@ -146,7 +146,7 @@ class UiAutomationExecutor(
         }
 
         is UiStep.SetText -> {
-            val node = requireOne(step.selector)
+            val node = requireOne(step.selector, deadline)
             if (node.isPassword) {
                 fail(
                     UiStepStatus.FAILED,
@@ -166,12 +166,24 @@ class UiAutomationExecutor(
         }
 
         is UiStep.Scroll -> {
-            val node = requireOne(step.selector)
-            val ok = when (step.direction) {
-                ScrollDirection.FORWARD -> node.performScrollForward()
-                ScrollDirection.BACKWARD -> node.performScrollBackward()
+            // Scroll actions are dispatched asynchronously by the framework —
+            // right after a previous scroll the node can still report the old
+            // scroll position and reject the action. Retry briefly on a fresh
+            // node before concluding the element genuinely cannot scroll.
+            val retryUntil = clock() + pollIntervalMillis * 6
+            var ok: Boolean
+            while (true) {
+                val node = requireOne(step.selector, deadline)
+                ok = when (step.direction) {
+                    ScrollDirection.FORWARD -> node.performScrollForward()
+                    ScrollDirection.BACKWARD -> node.performScrollBackward()
+                }
+                if (ok || clock() >= retryUntil) break
+                boundedDelay(pollIntervalMillis, deadline)
             }
             if (!ok) fail(UiStepStatus.FAILED, "Scroll not supported on ${step.selector.summary}")
+            // Let the scroll settle so the next step reads a current tree.
+            boundedDelay(pollIntervalMillis, deadline)
             "Scrolled ${step.direction.name.lowercase()}"
         }
 
@@ -189,6 +201,10 @@ class UiAutomationExecutor(
             )
             deadline.extend(clock() - askedAt)
             if (!approved) fail(UiStepStatus.CANCELLED, "Not confirmed — automation stopped")
+            // The shade or dialog that carried the answer may still be
+            // collapsing — let the target window become readable again
+            // before the next step queries the tree.
+            boundedDelay(pollIntervalMillis * 3, deadline)
             "Confirmed by user"
         }
     }
@@ -216,13 +232,25 @@ class UiAutomationExecutor(
         }
     }
 
-    /** Resolve a selector to exactly one node now, or fail. */
-    private fun requireOne(selector: UiSelector): UiNode {
-        val root = host.rootNode()
-            ?: fail(
-                UiStepStatus.FAILED,
-                "Screen not readable — the accessibility service is not connected or the current screen is protected"
-            )
+    /**
+     * Resolve a selector to exactly one node now, or fail. A null root is
+     * retried briefly: window transitions (a collapsing notification shade,
+     * a closing dialog) leave the screen unreadable for a moment without the
+     * service being disconnected.
+     */
+    private suspend fun requireOne(selector: UiSelector, deadline: Deadline): UiNode {
+        var root = host.rootNode()
+        val graceUntil = clock() + pollIntervalMillis * 10
+        while (root == null) {
+            if (clock() >= graceUntil) {
+                fail(
+                    UiStepStatus.FAILED,
+                    "Screen not readable — the accessibility service is not connected or the current screen is protected"
+                )
+            }
+            boundedDelay(pollIntervalMillis, deadline)
+            root = host.rootNode()
+        }
         return when (val r = finder.findOne(root, selector)) {
             is AccessibilityNodeFinder.Result.Found -> r.node
             AccessibilityNodeFinder.Result.NotFound ->
@@ -253,13 +281,27 @@ class UiAutomationExecutor(
         }
     }
 
-    private fun ensureOnTarget(targetPackage: String) {
-        val current = host.currentPackage()
-        if (current != null && current != targetPackage) {
-            fail(
-                UiStepStatus.FAILED,
-                "Foreground app changed to $current — stopped to avoid acting on the wrong app"
-            )
+    /**
+     * Foreground guard with two tolerances:
+     * - The system UI overlay (notification shade — e.g. the one that carried
+     *   a confirmation answer — volume panel, recents) covers the target app
+     *   without replacing it. The run WAITS for it to clear, bounded only by
+     *   the workflow deadline; it never acts while the overlay is up.
+     * - Anything else gets a short transition grace (window animations),
+     *   then fails: another app or a persistent dialog took over.
+     */
+    private suspend fun ensureOnTarget(targetPackage: String, deadline: Deadline) {
+        val graceUntil = clock() + pollIntervalMillis * 10
+        while (true) {
+            val current = host.currentPackage()
+            if (current == null || current == targetPackage) return
+            if (current != SYSTEM_UI_PACKAGE && clock() >= graceUntil) {
+                fail(
+                    UiStepStatus.FAILED,
+                    "Foreground app changed to $current — stopped to avoid acting on the wrong app"
+                )
+            }
+            boundedDelay(pollIntervalMillis, deadline)
         }
     }
 
@@ -270,4 +312,9 @@ class UiAutomationExecutor(
     }
 
     private fun fail(status: UiStepStatus, detail: String): Nothing = throw StepFailure(status, detail)
+
+    private companion object {
+        /** The status bar / notification shade / volume UI — an overlay, never a target. */
+        const val SYSTEM_UI_PACKAGE = "com.android.systemui"
+    }
 }
