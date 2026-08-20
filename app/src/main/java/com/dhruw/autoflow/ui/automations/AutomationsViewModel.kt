@@ -13,6 +13,9 @@ import com.dhruw.autoflow.automation.model.Automation
 import com.dhruw.autoflow.automation.model.Execution
 import com.dhruw.autoflow.automation.model.ExecutionStatus
 import com.dhruw.autoflow.data.repository.AutomationRepository
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -51,6 +54,11 @@ class AutomationsViewModel(
             try {
                 val result = runner.run(automation)
                 _messages.emit(resultMessage(automation, result))
+            } catch (e: CancellationException) {
+                // A user-cancelled UI automation surfaces as cancellation of
+                // the run only — the ViewModel scope itself stays alive.
+                currentCoroutineContext().ensureActive()
+                _messages.emit("\"${automation.name}\" cancelled")
             } finally {
                 runningIds.update { it - automationId }
             }

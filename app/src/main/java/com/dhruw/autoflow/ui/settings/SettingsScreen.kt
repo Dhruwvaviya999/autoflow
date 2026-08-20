@@ -33,6 +33,8 @@ import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Science
+import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Security
 import androidx.compose.material.icons.outlined.Wifi
 import androidx.compose.material3.HorizontalDivider
@@ -56,12 +58,15 @@ import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.dhruw.autoflow.AutoFlowApplication
+import com.dhruw.autoflow.services.accessibility.AccessibilityAccessManager
 import com.dhruw.autoflow.services.notification.NotificationAccessManager
 import com.dhruw.autoflow.ui.components.SectionHeader
+import com.dhruw.autoflow.ui.testlab.AccessibilityTestLabActivity
 
 @Composable
 fun SettingsScreen(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onOpenInspector: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val versionName = remember {
@@ -80,10 +85,13 @@ fun SettingsScreen(
     val notificationsAllowed = remember(refreshKey) {
         NotificationManagerCompat.from(context).areNotificationsEnabled()
     }
-    val accessManager = remember {
-        (context.applicationContext as AutoFlowApplication).container.notificationAccessManager
+    val container = remember {
+        (context.applicationContext as AutoFlowApplication).container
     }
+    val accessManager = container.notificationAccessManager
     val notificationAccess = remember(refreshKey) { accessManager.status() }
+    val accessibilityManager = container.accessibilityAccessManager
+    val accessibilityStatus = remember(refreshKey) { accessibilityManager.status() }
     // Bluetooth is a runtime permission only from Android 12.
     val bluetoothAllowed = remember(refreshKey) {
         Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
@@ -244,10 +252,26 @@ fun SettingsScreen(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             SettingsRow(
                 icon = Icons.Outlined.Accessibility,
-                title = "Accessibility",
-                description = "Not required yet",
-                statusColor = StatusColor.NEUTRAL,
-                onClick = null
+                title = "Accessibility Automation",
+                description = when (accessibilityStatus) {
+                    AccessibilityAccessManager.Status.ENABLED ->
+                        "Enabled — your UI automations can run"
+                    AccessibilityAccessManager.Status.DISABLED ->
+                        "Disabled — AutoFlow uses Android Accessibility only for " +
+                            "UI automations you create. Tap to enable."
+                    AccessibilityAccessManager.Status.UNAVAILABLE ->
+                        "Unavailable — this device blocks reading the setting"
+                },
+                statusColor = when (accessibilityStatus) {
+                    AccessibilityAccessManager.Status.ENABLED -> StatusColor.OK
+                    AccessibilityAccessManager.Status.DISABLED -> StatusColor.NEUTRAL
+                    AccessibilityAccessManager.Status.UNAVAILABLE -> StatusColor.WARN
+                },
+                onClick = if (accessibilityStatus == AccessibilityAccessManager.Status.ENABLED) {
+                    null
+                } else {
+                    { context.startActivity(accessibilityManager.settingsIntent()) }
+                }
             )
         }
 
@@ -282,7 +306,11 @@ fun SettingsScreen(
                             "only stored if an automation uses the Save " +
                             "notification action. AutoFlow can only read what " +
                             "apps put into their notifications — some apps hide " +
-                            "or shorten content.",
+                            "or shorten content. Accessibility is used only while " +
+                            "a UI automation you created is running or while the " +
+                            "Inspect UI tool is on; screen content is never " +
+                            "stored or sent anywhere, and AutoFlow never enters " +
+                            "passwords or payment details.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -316,6 +344,31 @@ fun SettingsScreen(
                     context.startActivity(
                         Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName)
+                    )
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SectionHeader(title = "Developer tools")
+        SettingsGroup {
+            SettingsRow(
+                icon = Icons.Outlined.Search,
+                title = "Inspect UI",
+                description = "Capture element details (text, ID, class) by tapping " +
+                    "them — for building selectors",
+                onClick = onOpenInspector
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
+                icon = Icons.Outlined.Science,
+                title = "Accessibility Test Lab",
+                description = "Safe screen with stable buttons and fields for " +
+                    "testing UI automations",
+                onClick = {
+                    context.startActivity(
+                        Intent(context, AccessibilityTestLabActivity::class.java)
                     )
                 }
             )

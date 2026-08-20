@@ -1,3 +1,13 @@
 <resources>
     <string name="app_name">AutoFlow</string>
+    <string name="accessibility_service_label">AutoFlow UI Automation</string>
+    <!-- Shown by Android in the accessibility settings screen. Must stay an
+         honest description of what the service does and why. -->
+    <string name="accessibility_service_description">AutoFlow uses accessibility
+        only to run the UI automations you create yourself — for example
+        opening an app, tapping a button, or entering text you configured.
+        It reads the screen only while one of your automations is running or
+        while you use the element inspector. Nothing is sent off this device.
+        AutoFlow never enters passwords, PINs or payment details, and pauses
+        for your confirmation before consequential steps.</string>
 </resources>

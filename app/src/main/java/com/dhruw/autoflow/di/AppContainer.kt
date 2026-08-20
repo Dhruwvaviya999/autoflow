@@ -36,6 +36,10 @@ import com.dhruw.autoflow.services.system.BatteryMonitor
 import com.dhruw.autoflow.services.system.NetworkMonitor
 import com.dhruw.autoflow.services.system.ScreenMonitor
 import com.dhruw.autoflow.services.system.SystemMonitorHub
+import com.dhruw.autoflow.services.accessibility.AccessibilityAccessManager
+import com.dhruw.autoflow.services.accessibility.UiAutomationActionHandler
+import com.dhruw.autoflow.services.accessibility.UiAutomationSessionManager
+import com.dhruw.autoflow.services.accessibility.UiInspector
 import com.dhruw.autoflow.services.instagram.InstagramAnalysisActionHandler
 import com.dhruw.autoflow.services.notification.AutomationNotifier
 import com.dhruw.autoflow.services.notification.InstalledApps
@@ -84,6 +88,15 @@ class AppContainer(context: Context) {
 
     val instagramAnalysisStore = InstagramAnalysisStore()
 
+    val accessibilityAccessManager = AccessibilityAccessManager(appContext)
+
+    /** Element-inspector state; in-memory only, user-started, auto-expiring. */
+    val uiInspector = UiInspector()
+
+    /** Single-session UI automation runtime (guard, cancel, confirmations). */
+    val uiAutomationSessionManager =
+        UiAutomationSessionManager(appContext, accessibilityAccessManager)
+
     /** Edge detection for system triggers; in-memory by design (see class doc). */
     val systemStateTracker = SystemStateTracker()
 
@@ -105,7 +118,8 @@ class AppContainer(context: Context) {
                 store = instagramAnalysisStore,
                 notifier = notifier
             ),
-            SaveNotificationActionHandler(notificationRecordRepository)
+            SaveNotificationActionHandler(notificationRecordRepository),
+            UiAutomationActionHandler(uiAutomationSessionManager)
         )
     )
 

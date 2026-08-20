@@ -1,9 +1,13 @@
 package com.dhruw.autoflow.automation.engine
 
+import com.dhruw.autoflow.automation.model.Automation
 import com.dhruw.autoflow.automation.model.SystemEvent
 import com.dhruw.autoflow.automation.model.Trigger
 import com.dhruw.autoflow.automation.model.TriggerPayload
 import com.dhruw.autoflow.data.repository.AutomationRepository
+import kotlin.coroutines.cancellation.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /**
  * Routes push-style trigger events to the automations they concern:
@@ -40,7 +44,21 @@ class AutomationEventDispatcher(
     private suspend fun dispatchSystem(event: SystemEvent) {
         val matching = enabledAutomations().filter { it.trigger.matchesSystem(event) }
         for (automation in matching) {
+            runIsolated(automation, event)
+        }
+    }
+
+    /**
+     * One automation cancelling (a user pressing Cancel on a UI automation
+     * surfaces as CancellationException) must not abort the other
+     * automations matched by the same event. Real coroutine cancellation
+     * still propagates.
+     */
+    private suspend fun runIsolated(automation: Automation, event: TriggerPayload) {
+        try {
             runner.run(automation, event)
+        } catch (e: CancellationException) {
+            currentCoroutineContext().ensureActive()
         }
     }
 
@@ -71,7 +89,7 @@ class AutomationEventDispatcher(
             (automation.trigger as? Trigger.NotificationTrigger)?.matches(event) == true
         }
         for (automation in matching) {
-            runner.run(automation, event)
+            runIsolated(automation, event)
         }
     }
 

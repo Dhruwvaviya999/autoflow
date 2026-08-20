@@ -53,6 +53,39 @@
             </intent-filter>
         </activity>
 
+        <!-- Stable in-app target for accessibility testing; reachable from
+             Settings → Developer tools. Production behavior never depends
+             on this screen. -->
+        <activity
+            android:name=".ui.testlab.AccessibilityTestLabActivity"
+            android:exported="false"
+            android:label="Accessibility Test Lab"
+            android:theme="@style/Theme.AutoFlow" />
+
+        <!-- Bound by the system only after the user enables AutoFlow in
+             Accessibility settings; AutoFlow never enables it itself. Used
+             exclusively to run user-configured UI automations and the
+             user-started element inspector. All processing is on-device. -->
+        <service
+            android:name=".services.accessibility.AutoFlowAccessibilityService"
+            android:exported="false"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- Handles Cancel/Continue taps on the UI-automation progress and
+             confirmation notifications. Not exported: only AutoFlow's own
+             PendingIntents can reach it — no remote control surface. -->
+        <receiver
+            android:name=".services.accessibility.UiAutomationControlReceiver"
+            android:exported="false" />
+
         <!-- Bound by the system only after the user grants notification
              access in Settings; AutoFlow never requests it automatically. -->
         <service
