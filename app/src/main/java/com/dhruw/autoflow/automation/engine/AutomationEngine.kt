@@ -1,5 +1,6 @@
 package com.dhruw.autoflow.automation.engine
 
+import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Automation
 import com.dhruw.autoflow.automation.model.Execution
 import com.dhruw.autoflow.automation.model.ExecutionStatus
@@ -8,6 +9,7 @@ import com.dhruw.autoflow.automation.model.displayName
 import java.util.UUID
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 /**
@@ -22,6 +24,8 @@ class AutomationEngine(
     private val clock: () -> Long = System::currentTimeMillis,
     private val newId: () -> String = { UUID.randomUUID().toString() }
 ) {
+
+    private val maxBranchDepth = EngineLimits.MAX_BRANCH_DEPTH
 
     suspend fun execute(
         automation: Automation,
@@ -75,21 +79,67 @@ class AutomationEngine(
             fileEvent = payload as? TriggerPayload.FileEvent,
             notificationEvent = payload as? TriggerPayload.NotificationEvent,
             automationId = automation.id,
-            payload = payload
+            payload = payload,
+            automationName = automation.name
         )
+
+        /**
+         * Runs one action, recursing into branches. Group markers and
+         * disabled steps are recorded and skipped; everything else goes
+         * through the handler registry. [depth] guards against pathological
+         * nesting beyond what the validator allows.
+         */
+        suspend fun runAction(action: Action, label: String, depth: Int) {
+            if (depth > maxBranchDepth) {
+                throw ActionExecutionException("Branch nesting exceeds $maxBranchDepth levels")
+            }
+            when (action) {
+                is Action.GroupMarker -> {
+                    logs += "— ${action.label.trim().ifBlank { "Group" }} —"
+                }
+                is Action.DisabledAction -> {
+                    logs += "Skipped $label (disabled)"
+                }
+                is Action.BranchAction -> {
+                    logs += "Started $label"
+                    val passed = conditionEvaluator.evaluate(action.condition, payload)
+                    val chosen = if (passed) action.thenActions else action.elseActions
+                    logs += if (passed) "Condition passed — running THEN" else {
+                        if (action.elseActions.isEmpty()) "Condition not met — nothing to run"
+                        else "Condition not met — running ELSE"
+                    }
+                    chosen.forEachIndexed { i, inner ->
+                        runAction(inner, "$label.${i + 1} ${inner.displayName}", depth + 1)
+                    }
+                    logs += "Completed $label"
+                }
+                else -> {
+                    logs += "Started $label"
+                    val handler = handlers.firstOrNull { it.canHandle(action) }
+                        ?: throw ActionExecutionException("No handler registered for ${action.displayName}")
+                    executeWithRetries(handler, action, context) { attempt, message ->
+                        logs += "Attempt $attempt failed: $message — retrying"
+                    }
+                    logs += "Completed $label"
+                }
+            }
+        }
+
+        val runDeadline = clock() + EngineLimits.MAX_RUN_MILLIS
 
         try {
             automation.actions.forEachIndexed { index, action ->
+                if (clock() >= runDeadline) {
+                    throw ActionExecutionException(
+                        "This run exceeded the ${EngineLimits.MAX_RUN_MILLIS / 60_000}-minute limit and was stopped"
+                    )
+                }
                 val label = "${index + 1}. ${action.displayName}"
                 execution = execution.copy(currentAction = label, logs = logs.toList())
                 onUpdate(execution)
-                logs += "Started $label"
 
-                val handler = handlers.firstOrNull { it.canHandle(action) }
-                    ?: throw ActionExecutionException("No handler registered for ${action.displayName}")
-                handler.execute(action, context)
+                runAction(action, label, depth = 0)
 
-                logs += "Completed $label"
                 execution = execution.copy(completedActions = index + 1)
             }
         } catch (e: CancellationException) {
@@ -111,5 +161,34 @@ class AutomationEngine(
             ExecutionStatus.SUCCESS,
             message = "${execution.completedActions} of ${execution.totalActions} actions completed"
         )
+    }
+
+    /**
+     * Runs a handler, retrying only steps [RetryPolicy] considers safe to
+     * repeat. Cancellation is never retried — it means the user stopped the
+     * run. The final failure propagates unchanged so the execution records
+     * the real reason.
+     */
+    private suspend fun executeWithRetries(
+        handler: ActionHandler,
+        action: Action,
+        context: ActionContext,
+        onRetry: (attempt: Int, message: String) -> Unit
+    ) {
+        val retries = RetryPolicy.retriesFor(action)
+        var attempt = 0
+        while (true) {
+            try {
+                handler.execute(action, context)
+                return
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (attempt >= retries) throw e
+                attempt++
+                onRetry(attempt, e.message ?: e.javaClass.simpleName)
+                delay(EngineLimits.RETRY_DELAY_MILLIS)
+            }
+        }
     }
 }

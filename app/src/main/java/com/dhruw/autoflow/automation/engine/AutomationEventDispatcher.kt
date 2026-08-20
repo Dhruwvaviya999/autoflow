@@ -25,10 +25,17 @@ import kotlinx.coroutines.ensureActive
 class AutomationEventDispatcher(
     private val automationRepository: AutomationRepository,
     private val runner: AutomationRunner,
-    private val deduplicator: NotificationDeduplicator = NotificationDeduplicator()
+    private val deduplicator: NotificationDeduplicator = NotificationDeduplicator(),
+    /**
+     * Diagnostic hook for Developer Tools. Deliberately receives the event
+     * KIND and a match count only — never the notification's content or the
+     * file's name.
+     */
+    private val onDiagnostic: (category: String, message: String) -> Unit = { _, _ -> }
 ) {
 
     suspend fun dispatch(event: TriggerPayload) {
+        onDiagnostic("event", event.diagnosticName)
         when (event) {
             is TriggerPayload.NotificationEvent -> dispatchNotification(event)
             is TriggerPayload.FileEvent -> Unit // handled by FileScanWorker (see class doc)
@@ -103,3 +110,21 @@ class AutomationEventDispatcher(
             .ifEmpty { automationRepository.getAll() }
             .filter { it.enabled }
 }
+
+/**
+ * The event's kind, for the diagnostic log. Never its content: no
+ * notification text, no file name, no SSID or device name.
+ */
+private val TriggerPayload.diagnosticName: String
+    get() = when (this) {
+        is TriggerPayload.NotificationEvent -> "Notification received"
+        is TriggerPayload.FileEvent -> "File detected"
+        is SystemEvent.BatteryChanged -> "Battery level changed"
+        is SystemEvent.ChargingChanged -> "Charging state changed"
+        is SystemEvent.WiFiChanged -> "Wi-Fi state changed"
+        is SystemEvent.NetworkChanged -> "Network state changed"
+        is SystemEvent.BluetoothChanged -> "Bluetooth device changed"
+        is SystemEvent.ScreenChanged -> "Screen state changed"
+        is SystemEvent.HeadsetChanged -> "Headset state changed"
+        is SystemEvent.DeviceBooted -> "Device booted"
+    }

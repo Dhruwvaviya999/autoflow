@@ -16,7 +16,8 @@ class LogActionHandler(
 
     override suspend fun execute(action: Action, context: ActionContext) {
         action as Action.LogAction
-        context.log(action.message)
-        sink(action.message)
+        val message = context.resolveTemplateOrFail(action.message)
+        context.log(message)
+        sink(message)
     }
 }

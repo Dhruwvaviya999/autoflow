@@ -10,5 +10,11 @@ data class Automation(
     val actions: List<Action> = emptyList(),
     val createdAt: Long,
     val updatedAt: Long,
-    val lastRunAt: Long? = null
+    val lastRunAt: Long? = null,
+    /**
+     * Switch the automation off automatically after this many consecutive
+     * failed runs. Null (the default) never auto-disables. The user is told
+     * locally when it happens.
+     */
+    val disableAfterFailures: Int? = null
 )

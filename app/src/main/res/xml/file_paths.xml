@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The only directory AutoFlow ever shares from: a dedicated subfolder of the
+    cache used for workflow files the user explicitly chose to share. The
+    database, preferences and every other app file stay outside it.
+-->
+<paths>
+    <cache-path name="shared_workflows" path="shared/" />
+</paths>

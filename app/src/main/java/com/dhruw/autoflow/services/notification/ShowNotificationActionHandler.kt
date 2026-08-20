@@ -19,11 +19,13 @@ class ShowNotificationActionHandler(
                 "Notifications are not allowed. Grant the notification permission in Settings."
             )
         }
+        val title = context.resolveTemplateOrFail(action.title)
+        val message = context.resolveTemplateOrFail(action.message)
         try {
-            notifier.notify(action.title, action.message)
+            notifier.notify(title, message)
         } catch (e: SecurityException) {
             throw ActionExecutionException("Notification was blocked by the system", e)
         }
-        context.log("Posted notification \"${action.title}\"")
+        context.log("Posted notification \"$title\"")
     }
 }

@@ -22,9 +22,17 @@ android {
 
     buildTypes {
         release {
-            optimization {
-                enable = false
-            }
+            // R8 shrinking/obfuscation with the default Android rules plus the
+            // project rules (Room/WorkManager/Compose entry points are kept by
+            // their own consumer rules).
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // No signingConfig here: release signing is left to a local
+            // keystore supplied at build time. Keys are never committed.
         }
     }
     compileOptions {

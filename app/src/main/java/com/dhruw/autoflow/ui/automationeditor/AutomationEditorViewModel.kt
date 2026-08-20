@@ -10,7 +10,10 @@ import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.dhruw.autoflow.AutoFlowApplication
 import com.dhruw.autoflow.automation.engine.AutomationScheduler
+import com.dhruw.autoflow.automation.engine.WorkflowValidator
 import com.dhruw.autoflow.automation.model.Action
+import com.dhruw.autoflow.automation.model.requiredCapabilities
+import com.dhruw.autoflow.services.CapabilityStatusProvider
 import com.dhruw.autoflow.automation.model.Automation
 import com.dhruw.autoflow.automation.model.Condition
 import com.dhruw.autoflow.automation.model.Trigger
@@ -31,15 +34,23 @@ data class EditorUiState(
     val conditions: List<Condition> = emptyList(),
     val actions: List<Action> = emptyList(),
     val enabled: Boolean = true,
-    val isEditing: Boolean = false
+    val isEditing: Boolean = false,
+    val disableAfterFailures: Int? = null,
+    /** Validation problems that block saving, refreshed as the user edits. */
+    val errors: List<String> = emptyList(),
+    val warnings: List<String> = emptyList(),
+    /** Non-null while the Test automation result is on screen. */
+    val testReport: TestReport? = null
 ) {
     val canSave: Boolean
-        get() = name.isNotBlank() && trigger != null && actions.isNotEmpty()
+        get() = name.isNotBlank() && trigger != null && actions.isNotEmpty() && errors.isEmpty()
 }
 
 class AutomationEditorViewModel(
     private val repository: AutomationRepository,
     private val scheduler: AutomationScheduler,
+    private val validator: WorkflowValidator,
+    private val capabilities: CapabilityStatusProvider,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -65,58 +76,140 @@ class AutomationEditorViewModel(
                         conditions = automation.conditions,
                         actions = automation.actions,
                         enabled = automation.enabled,
-                        isEditing = true
-                    )
+                        isEditing = true,
+                        disableAfterFailures = automation.disableAfterFailures
+                    ).withValidation()
                 }
             }
         }
     }
 
-    fun setName(name: String) = _uiState.update { it.copy(name = name) }
+    fun setName(name: String) = _uiState.update { it.copy(name = name).withValidation() }
 
     fun setDescription(description: String) = _uiState.update { it.copy(description = description) }
 
     fun setEnabled(enabled: Boolean) = _uiState.update { it.copy(enabled = enabled) }
 
-    fun setTrigger(trigger: Trigger?) = _uiState.update { it.copy(trigger = trigger) }
+    fun setTrigger(trigger: Trigger?) = _uiState.update { it.copy(trigger = trigger).withValidation() }
+
+    fun setDisableAfterFailures(value: Int?) = _uiState.update {
+        it.copy(disableAfterFailures = value)
+    }
 
     fun addCondition(condition: Condition) = _uiState.update { state ->
         if (condition in state.conditions) state
-        else state.copy(conditions = state.conditions + condition)
+        else state.copy(conditions = state.conditions + condition).withValidation()
     }
 
     fun removeCondition(index: Int) = _uiState.update { state ->
         state.copy(conditions = state.conditions.filterIndexed { i, _ -> i != index })
+            .withValidation()
     }
 
-    fun addAction(action: Action) = _uiState.update { it.copy(actions = it.actions + action) }
+    fun addAction(action: Action) = _uiState.update {
+        it.copy(actions = it.actions + action).withValidation()
+    }
 
     fun updateAction(index: Int, action: Action) = _uiState.update { state ->
         state.copy(actions = state.actions.mapIndexed { i, a -> if (i == index) action else a })
+            .withValidation()
     }
 
     fun removeAction(index: Int) = _uiState.update { state ->
-        state.copy(actions = state.actions.filterIndexed { i, _ -> i != index })
+        state.copy(actions = state.actions.filterIndexed { i, _ -> i != index }).withValidation()
+    }
+
+    fun moveAction(index: Int, delta: Int) = _uiState.update { state ->
+        val target = index + delta
+        if (index !in state.actions.indices || target !in state.actions.indices) {
+            state
+        } else {
+            state.copy(
+                actions = state.actions.toMutableList().apply {
+                    add(target, removeAt(index))
+                }
+            )
+        }
+    }
+
+    /**
+     * Switches a step off (wrapping it) or back on (unwrapping). Group
+     * markers are not executable, so the screen does not offer the toggle
+     * for them; a wrapped group would still be skipped harmlessly.
+     */
+    fun toggleActionEnabled(index: Int) = _uiState.update { state ->
+        state.copy(
+            actions = state.actions.mapIndexed { i, action ->
+                if (i != index) {
+                    action
+                } else {
+                    when (action) {
+                        is Action.DisabledAction -> action.wrapped
+                        else -> Action.DisabledAction(action)
+                    }
+                }
+            }
+        ).withValidation()
+    }
+
+    /**
+     * Dry run: validates the workflow and checks the permissions it needs
+     * against what Android currently grants. Executes nothing.
+     */
+    fun test() {
+        val state = _uiState.value
+        val automation = state.toAutomation(id = original?.id ?: "draft", now = 0L) ?: return
+        val report = validator.validate(automation)
+        val granted = capabilities.granted()
+        _uiState.update {
+            it.copy(
+                testReport = TestReport(
+                    issues = report.issues,
+                    missingCapabilities = automation.requiredCapabilities - granted,
+                    stepCount = state.actions.size
+                )
+            )
+        }
+    }
+
+    fun dismissTestReport() = _uiState.update { it.copy(testReport = null) }
+
+    private fun EditorUiState.withValidation(): EditorUiState {
+        val automation = toAutomation(id = original?.id ?: "draft", now = 0L)
+            ?: return copy(errors = emptyList(), warnings = emptyList())
+        val report = validator.validate(automation)
+        return copy(
+            errors = report.errors.map { it.message },
+            warnings = report.warnings.map { it.message }
+        )
+    }
+
+    private fun EditorUiState.toAutomation(id: String, now: Long): Automation? {
+        val currentTrigger = trigger ?: return null
+        return Automation(
+            id = id,
+            name = name.trim(),
+            description = description.trim(),
+            enabled = enabled,
+            trigger = currentTrigger,
+            conditions = conditions,
+            actions = actions,
+            createdAt = original?.createdAt ?: now,
+            updatedAt = now,
+            lastRunAt = original?.lastRunAt,
+            disableAfterFailures = disableAfterFailures
+        )
     }
 
     fun save() {
         val state = _uiState.value
-        val trigger = state.trigger
-        if (!state.canSave || trigger == null) return
+        if (!state.canSave) return
         viewModelScope.launch {
             val now = System.currentTimeMillis()
-            val automation = Automation(
+            val automation = state.toAutomation(
                 id = original?.id ?: UUID.randomUUID().toString(),
-                name = state.name.trim(),
-                description = state.description.trim(),
-                enabled = state.enabled,
-                trigger = trigger,
-                conditions = state.conditions,
-                actions = state.actions,
-                createdAt = original?.createdAt ?: now,
-                updatedAt = now,
-                lastRunAt = original?.lastRunAt
-            )
+                now = now
+            ) ?: return@launch
             repository.upsert(automation)
             if (automation.enabled) scheduler.schedule(automation) else scheduler.cancel(automation.id)
             _saved.emit(Unit)
@@ -130,6 +223,8 @@ class AutomationEditorViewModel(
                 AutomationEditorViewModel(
                     repository = container.automationRepository,
                     scheduler = container.scheduler,
+                    validator = container.workflowValidator,
+                    capabilities = container.capabilityStatusProvider,
                     savedStateHandle = createSavedStateHandle()
                 )
             }

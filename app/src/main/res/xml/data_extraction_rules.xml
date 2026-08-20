@@ -1,19 +1,23 @@
-<?xml version="1.0" encoding="utf-8"?><!--
-   Sample data extraction rules file; uncomment and customize as necessary.
-   See https://developer.android.com/about/versions/12/backup-restore#xml-changes
-   for details.
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Auto Backup is disabled in the manifest (android:allowBackup="false").
+    These rules exist as defense in depth for API 31+: neither cloud backup nor
+    device-to-device transfer may carry AutoFlow's database, preferences or
+    files, because they hold automation definitions and — when the user adds
+    the Save notification action — notification content.
+
+    Backing up is an explicit user action instead: Settings → Data → Back up
+    automations writes a workflow-only file to a location the user picks.
 -->
 <data-extraction-rules>
     <cloud-backup>
-        <!-- TODO: Use <include> and <exclude> to control what is backed up.
-        <include .../>
-        <exclude .../>
-        -->
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
     </cloud-backup>
-    <!--
     <device-transfer>
-        <include .../>
-        <exclude .../>
+        <exclude domain="database" path="." />
+        <exclude domain="sharedpref" path="." />
+        <exclude domain="file" path="." />
     </device-transfer>
-    -->
 </data-extraction-rules>

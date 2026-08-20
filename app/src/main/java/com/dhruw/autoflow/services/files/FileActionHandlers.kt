@@ -26,6 +26,7 @@ class CopyFileActionHandler(private val fileAccess: FileAccess) : ActionHandler 
         val file = context.requireFile()
         try {
             val newName = fileAccess.copyTo(file.uri, file.name, action.destinationFolderUri)
+            context.variables["result.fileName"] = newName
             context.log("Copied \"${file.name}\" to ${action.destinationLabel} as \"$newName\"")
         } catch (e: FileAccessException) {
             throw ActionExecutionException(e.message ?: "Copy failed", e)
@@ -42,6 +43,7 @@ class MoveFileActionHandler(private val fileAccess: FileAccess) : ActionHandler 
         val file = context.requireFile()
         try {
             val newName = fileAccess.moveTo(file.uri, file.name, action.destinationFolderUri)
+            context.variables["result.fileName"] = newName
             context.log("Moved \"${file.name}\" to ${action.destinationLabel} as \"$newName\"")
         } catch (e: FileAccessException) {
             throw ActionExecutionException(e.message ?: "Move failed", e)
@@ -56,8 +58,10 @@ class RenameFileActionHandler(private val fileAccess: FileAccess) : ActionHandle
     override suspend fun execute(action: Action, context: ActionContext) {
         action as Action.RenameFileAction
         val file = context.requireFile()
+        val newName = context.resolveTemplateOrFail(action.newName)
         try {
-            val finalName = fileAccess.rename(file.uri, action.newName)
+            val finalName = fileAccess.rename(file.uri, newName)
+            context.variables["result.fileName"] = finalName
             context.log("Renamed \"${file.name}\" to \"$finalName\"")
         } catch (e: FileAccessException) {
             throw ActionExecutionException(e.message ?: "Rename failed", e)

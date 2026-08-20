@@ -26,8 +26,10 @@ import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Bluetooth
 import androidx.compose.material.icons.outlined.Bolt
+import androidx.compose.material.icons.outlined.CallSplit
 import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.DataObject
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.Extension
@@ -35,10 +37,13 @@ import androidx.compose.material.icons.outlined.FileCopy
 import androidx.compose.material.icons.outlined.FolderOpen
 import androidx.compose.material.icons.outlined.Headset
 import androidx.compose.material.icons.outlined.HourglassEmpty
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.NetworkCheck
 import androidx.compose.material.icons.outlined.Notifications
 import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.PauseCircle
 import androidx.compose.material.icons.outlined.PersonSearch
+import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.RestartAlt
 import androidx.compose.material.icons.outlined.Save
 import androidx.compose.material.icons.outlined.Schedule
@@ -70,6 +75,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -80,6 +86,7 @@ import com.dhruw.autoflow.automation.model.Condition
 import com.dhruw.autoflow.automation.model.Trigger
 import com.dhruw.autoflow.automation.model.displayName
 import com.dhruw.autoflow.automation.model.summary
+import com.dhruw.autoflow.automation.model.unwrapped
 import com.dhruw.autoflow.ui.components.icon
 
 private enum class EditorSheet { TRIGGER, CONDITION, ACTION }
@@ -115,6 +122,9 @@ private sealed interface EditorDialog {
     data class MoveFile(val index: Int?) : EditorDialog
     data class RenameFile(val index: Int?) : EditorDialog
     data class UiAutomation(val index: Int?) : EditorDialog
+    data class SetVariable(val index: Int?) : EditorDialog
+    data class Branch(val index: Int?) : EditorDialog
+    data class Group(val index: Int?) : EditorDialog
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -156,6 +166,10 @@ fun AutomationEditorScreen(
                     }
                 },
                 actions = {
+                    TextButton(
+                        enabled = state.trigger != null && state.actions.isNotEmpty(),
+                        onClick = viewModel::test
+                    ) { Text("Test") }
                     TextButton(enabled = state.canSave, onClick = viewModel::save) {
                         Text("Save")
                     }
@@ -255,12 +269,19 @@ fun AutomationEditorScreen(
 
             SectionLabel("THEN")
             state.actions.forEachIndexed { index, action ->
+                val effective = (action as? Action.DisabledAction)?.wrapped ?: action
                 EditorItemCard(
                     icon = action.icon,
                     title = "${index + 1}.  ${action.displayName}",
                     subtitle = action.summary,
+                    enabled = action !is Action.DisabledAction,
+                    onToggle = if (effective is Action.GroupMarker) {
+                        null
+                    } else {
+                        { viewModel.toggleActionEnabled(index) }
+                    },
                     onClick = {
-                        dialog = when (action) {
+                        dialog = when (effective) {
                             is Action.ShowNotificationAction -> EditorDialog.Notification(index)
                             is Action.DelayAction -> EditorDialog.Delay(index)
                             is Action.LogAction -> EditorDialog.Log(index)
@@ -270,6 +291,11 @@ fun AutomationEditorScreen(
                             is Action.InstagramAnalysisAction -> null
                             is Action.SaveNotificationAction -> null
                             is Action.UiAutomationAction -> EditorDialog.UiAutomation(index)
+                            is Action.SetVariableAction -> EditorDialog.SetVariable(index)
+                            is Action.BranchAction -> EditorDialog.Branch(index)
+                            // Unwrapped above; a nested DisabledAction is not possible.
+                            is Action.DisabledAction -> null
+                            is Action.GroupMarker -> EditorDialog.Group(index)
                         }
                     },
                     onDelete = { viewModel.removeAction(index) }
@@ -285,6 +311,17 @@ fun AutomationEditorScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
+
+            if (state.errors.isNotEmpty() || state.warnings.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(20.dp))
+                ValidationSummary(errors = state.errors, warnings = state.warnings)
+            }
+
+            SectionLabel("WHEN IT FAILS")
+            FailurePolicyRow(
+                value = state.disableAfterFailures,
+                onChange = viewModel::setDisableAfterFailures
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
         }
@@ -462,6 +499,15 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.TouchApp, "UI Automation", "Tap, type and navigate inside another app") {
                     dialog = EditorDialog.UiAutomation(index = null)
+                },
+                PickerOption(Icons.Outlined.DataObject, "Set variable", "Store a value for later steps") {
+                    dialog = EditorDialog.SetVariable(index = null)
+                },
+                PickerOption(Icons.Outlined.CallSplit, "If / else", "Run different steps depending on a condition") {
+                    dialog = EditorDialog.Branch(index = null)
+                },
+                PickerOption(Icons.Outlined.Label, "Group label", "Organize the steps below it") {
+                    dialog = EditorDialog.Group(index = null)
                 }
             ),
             onDismiss = { sheet = null }
@@ -470,9 +516,13 @@ fun AutomationEditorScreen(
         null -> Unit
     }
 
+    state.testReport?.let { report ->
+        TestAutomationDialog(report = report, onDismiss = viewModel::dismissTestReport)
+    }
+
     when (val d = dialog) {
         is EditorDialog.Notification -> NotificationActionDialog(
-            initial = d.index?.let { state.actions[it] as Action.ShowNotificationAction },
+            initial = d.index?.let { state.actions[it].unwrapped as Action.ShowNotificationAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
@@ -483,7 +533,7 @@ fun AutomationEditorScreen(
         )
 
         is EditorDialog.Delay -> DelayActionDialog(
-            initial = d.index?.let { state.actions[it] as Action.DelayAction },
+            initial = d.index?.let { state.actions[it].unwrapped as Action.DelayAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
@@ -493,7 +543,7 @@ fun AutomationEditorScreen(
         )
 
         is EditorDialog.Log -> LogActionDialog(
-            initial = d.index?.let { state.actions[it] as Action.LogAction },
+            initial = d.index?.let { state.actions[it].unwrapped as Action.LogAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
@@ -682,7 +732,37 @@ fun AutomationEditorScreen(
         )
 
         is EditorDialog.RenameFile -> RenameFileActionDialog(
-            initial = d.index?.let { state.actions[it] as Action.RenameFileAction },
+            initial = d.index?.let { state.actions[it].unwrapped as Action.RenameFileAction },
+            onDismiss = { dialog = null },
+            onConfirm = { action ->
+                if (d.index == null) viewModel.addAction(action)
+                else viewModel.updateAction(d.index, action)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.SetVariable -> SetVariableActionDialog(
+            initial = d.index?.let { state.actions[it].unwrapped as Action.SetVariableAction },
+            onDismiss = { dialog = null },
+            onConfirm = { action ->
+                if (d.index == null) viewModel.addAction(action)
+                else viewModel.updateAction(d.index, action)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.Branch -> BranchActionDialog(
+            initial = d.index?.let { state.actions[it].unwrapped as Action.BranchAction },
+            onDismiss = { dialog = null },
+            onConfirm = { action ->
+                if (d.index == null) viewModel.addAction(action)
+                else viewModel.updateAction(d.index, action)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.Group -> GroupMarkerDialog(
+            initial = d.index?.let { state.actions[it].unwrapped as Action.GroupMarker },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
@@ -692,7 +772,7 @@ fun AutomationEditorScreen(
         )
 
         is EditorDialog.UiAutomation -> UiAutomationEditorDialog(
-            initial = d.index?.let { state.actions[it] as Action.UiAutomationAction },
+            initial = d.index?.let { state.actions[it].unwrapped as Action.UiAutomationAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
@@ -715,13 +795,102 @@ private fun SectionLabel(text: String) {
     )
 }
 
+/**
+ * Blocking errors and advisory warnings from the central workflow validator.
+ * Errors disable Save; warnings never do.
+ */
+@Composable
+private fun ValidationSummary(errors: List<String>, warnings: List<String>) {
+    if (errors.isNotEmpty()) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.errorContainer,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                errors.forEach { message ->
+                    Text(
+                        text = message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onErrorContainer
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(8.dp))
+    }
+    if (warnings.isNotEmpty()) {
+        Surface(
+            shape = MaterialTheme.shapes.medium,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp)) {
+                warnings.forEach { message ->
+                    Text(
+                        text = "⚠ $message",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Optional consecutive-failure auto-disable. Off by default: an automation
+ * only switches itself off when the user asks for it.
+ */
+@Composable
+private fun FailurePolicyRow(value: Int?, onChange: (Int?) -> Unit) {
+    Surface(
+        shape = MaterialTheme.shapes.medium,
+        color = MaterialTheme.colorScheme.surfaceContainerLow,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Switch off after repeated failures", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = value?.let { "After $it failed runs in a row" }
+                            ?: "Never switches itself off",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Switch(
+                    checked = value != null,
+                    onCheckedChange = { enabled -> onChange(if (enabled) 5 else null) }
+                )
+            }
+            if (value != null) {
+                Spacer(modifier = Modifier.height(10.dp))
+                Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+                    listOf(3, 5, 10).forEach { candidate ->
+                        androidx.compose.material3.FilterChip(
+                            selected = value == candidate,
+                            onClick = { onChange(candidate) },
+                            label = { Text("$candidate", style = MaterialTheme.typography.labelSmall) }
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun EditorItemCard(
     icon: ImageVector,
     title: String,
     subtitle: String,
     onClick: (() -> Unit)?,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    enabled: Boolean = true,
+    onToggle: (() -> Unit)? = null
 ) {
     Surface(
         shape = MaterialTheme.shapes.medium,
@@ -732,7 +901,8 @@ private fun EditorItemCard(
         Row(
             modifier = Modifier
                 .then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
-                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+                .padding(start = 16.dp, top = 12.dp, bottom = 12.dp, end = 4.dp)
+                .then(if (enabled) Modifier else Modifier.alpha(0.45f)),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -745,10 +915,20 @@ private fun EditorItemCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = title, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = subtitle,
+                    text = if (enabled) subtitle else "$subtitle · disabled",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+            if (onToggle != null) {
+                IconButton(onClick = onToggle) {
+                    Icon(
+                        imageVector = if (enabled) Icons.Outlined.PauseCircle else Icons.Outlined.PlayCircle,
+                        contentDescription = if (enabled) "Disable step" else "Enable step",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
             IconButton(onClick = onDelete) {
                 Icon(

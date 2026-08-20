@@ -5,6 +5,9 @@ import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Apps
+import androidx.compose.material.icons.outlined.CallSplit
+import androidx.compose.material.icons.outlined.DataObject
+import androidx.compose.material.icons.outlined.Label
 import androidx.compose.material.icons.outlined.BatteryAlert
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.Bluetooth
@@ -93,6 +96,10 @@ val Action.icon: ImageVector
         is Action.InstagramAnalysisAction -> Icons.Outlined.PersonSearch
         is Action.SaveNotificationAction -> Icons.Outlined.Save
         is Action.UiAutomationAction -> Icons.Outlined.TouchApp
+        is Action.SetVariableAction -> Icons.Outlined.DataObject
+        is Action.BranchAction -> Icons.Outlined.CallSplit
+        is Action.DisabledAction -> wrapped.icon
+        is Action.GroupMarker -> Icons.Outlined.Label
     }
 
 val ExecutionStatus.icon: ImageVector

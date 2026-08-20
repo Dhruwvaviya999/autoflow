@@ -27,7 +27,11 @@ import androidx.compose.material.icons.automirrored.outlined.KeyboardArrowRight
 import androidx.compose.material.icons.outlined.Accessibility
 import androidx.compose.material.icons.outlined.BatteryChargingFull
 import androidx.compose.material.icons.outlined.Bluetooth
+import androidx.compose.material.icons.outlined.Dashboard
 import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.MonitorHeart
+import androidx.compose.material.icons.outlined.Shield
+import androidx.compose.material.icons.outlined.Storage
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
@@ -71,7 +75,11 @@ import com.dhruw.autoflow.ui.testlab.AccessibilityTestLabActivity
 @Composable
 fun SettingsScreen(
     modifier: Modifier = Modifier,
-    onOpenInspector: () -> Unit = {}
+    onOpenInspector: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {},
+    onOpenPrivacy: () -> Unit = {},
+    onOpenData: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val versionName = remember {
@@ -360,6 +368,42 @@ fun SettingsScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
+        SectionHeader(title = "Automation")
+        SettingsGroup {
+            SettingsRow(
+                icon = Icons.Outlined.Dashboard,
+                title = "Templates",
+                description = "Start from a ready-made workflow",
+                onClick = onOpenTemplates
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SectionHeader(title = "Privacy")
+        SettingsGroup {
+            SettingsRow(
+                icon = Icons.Outlined.Shield,
+                title = "Privacy center",
+                description = "What AutoFlow stores and what it can see",
+                onClick = onOpenPrivacy
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
+        SectionHeader(title = "Storage")
+        SettingsGroup {
+            SettingsRow(
+                icon = Icons.Outlined.Storage,
+                title = "Data",
+                description = "Back up, import, and clear local data",
+                onClick = onOpenData
+            )
+        }
+
+        Spacer(modifier = Modifier.height(24.dp))
+
         SectionHeader(title = "Developer tools")
         SettingsGroup {
             SettingsRow(
@@ -380,6 +424,13 @@ fun SettingsScreen(
                         Intent(context, AccessibilityTestLabActivity::class.java)
                     )
                 }
+            )
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            SettingsRow(
+                icon = Icons.Outlined.MonitorHeart,
+                title = "Diagnostics",
+                description = "Scheduler state, database counts and an opt-in event log",
+                onClick = onOpenDiagnostics
             )
         }
 

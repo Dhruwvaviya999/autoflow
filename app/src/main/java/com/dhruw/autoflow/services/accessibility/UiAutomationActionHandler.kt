@@ -25,7 +25,9 @@ class UiAutomationActionHandler(
             action = uiAction,
             payload = context.payload,
             automationId = context.automationId,
-            onLog = context.log
+            onLog = context.log,
+            runVariables = context.variables.toMap(),
+            automationName = context.automationName
         )) {
             UiAutomationSessionManager.RunResult.Busy -> {
                 context.log("Skipped: UI automation already running")

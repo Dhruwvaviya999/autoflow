@@ -18,9 +18,32 @@ class ActionContext(
     val fileEvent: com.dhruw.autoflow.automation.model.TriggerPayload.FileEvent? = null,
     val notificationEvent: com.dhruw.autoflow.automation.model.TriggerPayload.NotificationEvent? = null,
     val automationId: String? = null,
-    /** The run's raw trigger payload (any kind) — feeds UI automation templates. */
-    val payload: com.dhruw.autoflow.automation.model.TriggerPayload? = null
-)
+    /** The run's raw trigger payload (any kind) — feeds templates. */
+    val payload: com.dhruw.autoflow.automation.model.TriggerPayload? = null,
+    /** Display name of the automation, for {{automation.name}}. */
+    val automationName: String? = null,
+    /**
+     * Run-scoped variables: workflow-locals written by Set variable and
+     * `result.*` outputs written by handlers (e.g. result.count,
+     * result.fileName). String-valued, local to this run, never persisted
+     * beyond the execution record's variable snapshot.
+     */
+    val variables: MutableMap<String, String> = mutableMapOf()
+) {
+    /** Resolve a template against this run (payload + variables + name). */
+    fun resolveTemplate(template: String): TemplateResolver.Result =
+        TemplateResolver.resolve(template, payload, variables, automationName)
+
+    /** Resolve a template or throw the standard user-explainable failure. */
+    fun resolveTemplateOrFail(template: String): String =
+        when (val r = resolveTemplate(template)) {
+            is TemplateResolver.Result.Ok -> r.text
+            is TemplateResolver.Result.UnknownVariable ->
+                throw ActionExecutionException("Unknown variable {{${r.variable}}}")
+            is TemplateResolver.Result.Unavailable ->
+                throw ActionExecutionException("Variable {{${r.variable}}} not available for this trigger")
+        }
+}
 
 /**
  * Executes one kind of [Action]. Platform-dependent handlers (notifications,

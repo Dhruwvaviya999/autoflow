@@ -18,7 +18,8 @@ fun Automation.toEntity(): AutomationEntity = AutomationEntity(
     actionsJson = WorkflowJson.encodeActions(actions),
     createdAt = createdAt,
     updatedAt = updatedAt,
-    lastRunAt = lastRunAt
+    lastRunAt = lastRunAt,
+    disableAfterFailures = disableAfterFailures
 )
 
 /** @throws WorkflowJsonException when the stored workflow JSON is malformed. */
@@ -32,7 +33,8 @@ fun AutomationEntity.toDomain(): Automation = Automation(
     actions = WorkflowJson.decodeActions(actionsJson),
     createdAt = createdAt,
     updatedAt = updatedAt,
-    lastRunAt = lastRunAt
+    lastRunAt = lastRunAt,
+    disableAfterFailures = disableAfterFailures
 )
 
 fun Execution.toEntity(): ExecutionEntity = ExecutionEntity(

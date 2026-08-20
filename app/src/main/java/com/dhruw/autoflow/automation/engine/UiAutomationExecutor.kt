@@ -71,6 +71,8 @@ class UiAutomationExecutor(
         steps: List<UiStep>,
         payload: TriggerPayload?,
         overallTimeoutMillis: Long,
+        runVariables: Map<String, String> = emptyMap(),
+        automationName: String? = null,
         onStepStarted: (index: Int, step: UiStep) -> Unit = { _, _ -> },
         onStep: (UiStepResult) -> Unit = {}
     ): Outcome {
@@ -85,7 +87,7 @@ class UiAutomationExecutor(
                 if (launched && step.needsPackageGuard()) ensureOnTarget(targetPackage, deadline)
                 onStepStarted(index, step)
 
-                val detail = execute(step, payload, deadline)
+                val detail = execute(step, payload, deadline, runVariables, automationName)
                 if (step is UiStep.LaunchApp) launched = true
                 UiStepResult(index, step.displayName, UiStepStatus.SUCCESS, detail)
             } catch (e: StepFailure) {
@@ -108,7 +110,9 @@ class UiAutomationExecutor(
     private suspend fun execute(
         step: UiStep,
         payload: TriggerPayload?,
-        deadline: Deadline
+        deadline: Deadline,
+        runVariables: Map<String, String>,
+        automationName: String?
     ): String = when (step) {
         is UiStep.LaunchApp -> {
             val ok = host.launchApp(step.packageName)
@@ -154,7 +158,7 @@ class UiAutomationExecutor(
                 )
             }
             if (!node.isEditable) fail(UiStepStatus.FAILED, "${step.selector.summary} is not a text field")
-            val text = when (val r = TemplateResolver.resolve(step.text, payload)) {
+            val text = when (val r = TemplateResolver.resolve(step.text, payload, runVariables, automationName)) {
                 is TemplateResolver.Result.Ok -> r.text
                 is TemplateResolver.Result.UnknownVariable ->
                     fail(UiStepStatus.FAILED, "Unknown variable {{${r.variable}}}")

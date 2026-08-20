@@ -78,7 +78,9 @@ class UiAutomationSessionManager(
         action: Action.UiAutomationAction,
         payload: TriggerPayload?,
         automationId: String?,
-        onLog: (String) -> Unit
+        onLog: (String) -> Unit,
+        runVariables: Map<String, String> = emptyMap(),
+        automationName: String? = null
     ): RunResult {
         if (!accessManager.isEnabled() || !accessManager.isServiceConnected()) {
             return RunResult.ServiceUnavailable
@@ -105,6 +107,8 @@ class UiAutomationSessionManager(
                     steps = action.steps,
                     payload = payload,
                     overallTimeoutMillis = action.overallTimeoutMillis,
+                    runVariables = runVariables,
+                    automationName = automationName,
                     onStepStarted = { index, step ->
                         _session.update {
                             it?.copy(currentStep = index + 1, status = UiSessionStatus.RUNNING)

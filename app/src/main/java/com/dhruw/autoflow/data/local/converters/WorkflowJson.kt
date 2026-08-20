@@ -65,6 +65,10 @@ object WorkflowJson {
     private const val ACTION_INSTAGRAM_ANALYSIS = "instagram_analysis"
     private const val ACTION_SAVE_NOTIFICATION = "save_notification"
     private const val ACTION_UI_AUTOMATION = "ui_automation"
+    private const val ACTION_SET_VARIABLE = "set_variable"
+    private const val ACTION_BRANCH = "branch"
+    private const val ACTION_DISABLED = "disabled"
+    private const val ACTION_GROUP_MARKER = "group_marker"
     private const val STEP_LAUNCH_APP = "launch_app"
     private const val STEP_WAIT = "wait"
     private const val STEP_WAIT_FOR_ELEMENT = "wait_for_element"
@@ -313,7 +317,9 @@ object WorkflowJson {
     fun encodeActions(actions: List<Action>): String =
         JSONArray(actions.map(::actionToJson)).toString()
 
-    fun decodeActions(raw: String): List<Action> = parseArray(raw) { json ->
+    fun decodeActions(raw: String): List<Action> = parseArray(raw, ::decodeAction)
+
+    private fun decodeAction(json: JSONObject): Action =
         when (val type = json.getString(KEY_TYPE)) {
             ACTION_SHOW_NOTIFICATION -> Action.ShowNotificationAction(
                 title = json.getString("title"),
@@ -340,9 +346,25 @@ object WorkflowJson {
                     List(arr.length()) { decodeUiStep(arr.getJSONObject(it)) }
                 }
             )
+            ACTION_SET_VARIABLE -> Action.SetVariableAction(
+                name = json.getString("name"),
+                value = json.getString("value")
+            )
+            ACTION_BRANCH -> Action.BranchAction(
+                condition = decodeCondition(json.getJSONObject("condition")),
+                thenActions = json.getJSONArray("thenActions").let { arr ->
+                    List(arr.length()) { decodeAction(arr.getJSONObject(it)) }
+                },
+                elseActions = json.getJSONArray("elseActions").let { arr ->
+                    List(arr.length()) { decodeAction(arr.getJSONObject(it)) }
+                }
+            )
+            ACTION_DISABLED -> Action.DisabledAction(
+                wrapped = decodeAction(json.getJSONObject("wrapped"))
+            )
+            ACTION_GROUP_MARKER -> Action.GroupMarker(label = json.getString("label"))
             else -> throw WorkflowJsonException("Unknown action type: $type")
         }
-    }
 
     private fun actionToJson(action: Action): JSONObject = when (action) {
         is Action.ShowNotificationAction -> JSONObject()
@@ -376,6 +398,21 @@ object WorkflowJson {
             .put("targetLabel", action.targetLabel)
             .put("overallTimeoutMillis", action.overallTimeoutMillis)
             .put("steps", JSONArray(action.steps.map(::uiStepToJson)))
+        is Action.SetVariableAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_SET_VARIABLE)
+            .put("name", action.name)
+            .put("value", action.value)
+        is Action.BranchAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_BRANCH)
+            .put("condition", conditionToJson(action.condition))
+            .put("thenActions", JSONArray(action.thenActions.map(::actionToJson)))
+            .put("elseActions", JSONArray(action.elseActions.map(::actionToJson)))
+        is Action.DisabledAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_DISABLED)
+            .put("wrapped", actionToJson(action.wrapped))
+        is Action.GroupMarker -> JSONObject()
+            .put(KEY_TYPE, ACTION_GROUP_MARKER)
+            .put("label", action.label)
     }
 
     // --- UI steps ---

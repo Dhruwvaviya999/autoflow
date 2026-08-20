@@ -69,7 +69,50 @@ sealed interface Action {
         val steps: List<UiStep> = emptyList(),
         val overallTimeoutMillis: Long = 60_000
     ) : Action
+
+    /**
+     * Store a workflow-local variable for later steps in the same run.
+     * [value] may contain {{...}} templates (payload variables, earlier
+     * locals, action outputs). Variables are run-scoped, string-valued and
+     * never persisted — deterministic substitution only, no expressions.
+     */
+    data class SetVariableAction(
+        val name: String,
+        val value: String
+    ) : Action
+
+    /**
+     * Run [thenActions] when [condition] passes, [elseActions] otherwise.
+     * Uses the same Condition vocabulary as the automation's IF section and
+     * the same handlers for the nested actions. Nesting depth is capped by
+     * the workflow validator.
+     */
+    data class BranchAction(
+        val condition: Condition,
+        val thenActions: List<Action> = emptyList(),
+        val elseActions: List<Action> = emptyList()
+    ) : Action
+
+    /**
+     * A step the user switched off without deleting it. The engine skips it
+     * (recorded in the run log) and never executes [wrapped].
+     */
+    data class DisabledAction(val wrapped: Action) : Action
+
+    /**
+     * Organizational header between steps ("Preparation", "Finalization").
+     * Not executable — the engine records it in the log and moves on.
+     */
+    data class GroupMarker(val label: String) : Action
 }
+
+/** The action itself, or the step inside a [Action.DisabledAction] wrapper. */
+val Action.unwrapped: Action
+    get() = (this as? Action.DisabledAction)?.wrapped ?: this
+
+/** False when this step is switched off and will be skipped. */
+val Action.isEnabled: Boolean
+    get() = this !is Action.DisabledAction
 
 val Action.displayName: String
     get() = when (this) {
@@ -82,6 +125,10 @@ val Action.displayName: String
         is Action.InstagramAnalysisAction -> "Instagram analysis"
         is Action.SaveNotificationAction -> "Save notification"
         is Action.UiAutomationAction -> "UI automation"
+        is Action.SetVariableAction -> "Set variable"
+        is Action.BranchAction -> "If / else"
+        is Action.DisabledAction -> wrapped.displayName
+        is Action.GroupMarker -> "Group"
     }
 
 val Action.summary: String
@@ -101,4 +148,12 @@ val Action.summary: String
             append(steps.size).append(if (steps.size == 1) " step" else " steps")
             append(" on ").append(targetLabel.ifBlank { targetPackage.ifBlank { "an app" } })
         }
+        is Action.SetVariableAction -> "${name.trim()} = ${value.trim().ifBlank { "\"\"" }}"
+        is Action.BranchAction -> buildString {
+            append("If ").append(condition.summary)
+            append(" · ").append(thenActions.size).append(" then")
+            if (elseActions.isNotEmpty()) append(" / ").append(elseActions.size).append(" else")
+        }
+        is Action.DisabledAction -> wrapped.summary
+        is Action.GroupMarker -> label.trim().ifBlank { "Group" }
     }

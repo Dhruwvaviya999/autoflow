@@ -20,5 +20,7 @@ data class AutomationEntity(
     @ColumnInfo(name = "actions_json") val actionsJson: String,
     @ColumnInfo(name = "created_at") val createdAt: Long,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
-    @ColumnInfo(name = "last_run_at") val lastRunAt: Long?
+    @ColumnInfo(name = "last_run_at") val lastRunAt: Long?,
+    /** Consecutive-failure auto-disable threshold; null disables the policy. */
+    @ColumnInfo(name = "disable_after_failures") val disableAfterFailures: Int? = null
 )

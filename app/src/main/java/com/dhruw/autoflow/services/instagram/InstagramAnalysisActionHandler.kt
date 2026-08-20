@@ -53,6 +53,9 @@ class InstagramAnalysisActionHandler(
         }
 
         store.publish(result)
+        context.variables["result.count"] = result.notFollowingBackCount.toString()
+        context.variables["result.followers"] = result.followersCount.toString()
+        context.variables["result.following"] = result.followingCount.toString()
         context.log(
             "Instagram analysis of \"${file.name}\": " +
                 "${result.followersCount} followers, ${result.followingCount} following, " +

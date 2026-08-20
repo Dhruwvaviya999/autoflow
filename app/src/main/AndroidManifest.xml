@@ -30,9 +30,19 @@
         </intent>
     </queries>
 
+    <!--
+         Android Auto Backup is OFF on purpose. It would copy AutoFlow's whole
+         data directory — including the automation database and any saved
+         notification records — to the user's cloud backup account. AutoFlow's
+         promise is that nothing leaves the device automatically, so backing up
+         is an explicit action instead: Settings → Data → Back up automations
+         writes a workflow-only file the user chooses the location for.
+         The rules files below stay as defense in depth if this flag is ever
+         flipped: they exclude the database and preferences either way.
+    -->
     <application
         android:name=".AutoFlowApplication"
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:icon="@mipmap/ic_launcher"
@@ -97,6 +107,19 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- Hands a workflow file to another app when the user taps Share.
+             Not exported: only AutoFlow can create the URIs, each grant is
+             read-only, temporary, and scoped to one file in cache/shared. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
 
         <!-- BOOT_COMPLETED and Bluetooth ACL broadcasts are protected system
              broadcasts (only the OS can send them), so exporting is safe.

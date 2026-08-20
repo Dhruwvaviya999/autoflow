@@ -1,6 +1,7 @@
 package com.dhruw.autoflow.data.repository
 
 import android.util.Log
+import com.dhruw.autoflow.automation.engine.EngineLimits
 import com.dhruw.autoflow.automation.model.Execution
 import com.dhruw.autoflow.data.local.converters.WorkflowJsonException
 import com.dhruw.autoflow.data.local.converters.toDomain
@@ -21,7 +22,7 @@ import kotlinx.coroutines.flow.stateIn
 class RoomExecutionRepository(
     private val dao: ExecutionDao,
     scope: CoroutineScope,
-    private val maxEntries: Int = 200
+    private val maxEntries: Int = EngineLimits.MAX_HISTORY_ROWS
 ) : ExecutionRepository {
 
     override val executions: StateFlow<List<Execution>> =

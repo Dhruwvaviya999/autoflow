@@ -1,5 +1,6 @@
 package com.dhruw.autoflow.data.repository
 
+import com.dhruw.autoflow.automation.engine.EngineLimits
 import com.dhruw.autoflow.automation.model.NotificationRecord
 import com.dhruw.autoflow.data.local.converters.toDomain
 import com.dhruw.autoflow.data.local.converters.toEntity
@@ -13,7 +14,7 @@ import com.dhruw.autoflow.data.local.dao.NotificationRecordDao
  */
 class RoomNotificationRecordRepository(
     private val dao: NotificationRecordDao,
-    private val maxEntries: Int = 500
+    private val maxEntries: Int = EngineLimits.MAX_NOTIFICATION_RECORDS
 ) : NotificationRecordRepository {
 
     override suspend fun save(record: NotificationRecord) {

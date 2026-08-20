@@ -43,6 +43,13 @@ import com.dhruw.autoflow.ui.components.icon
 import com.dhruw.autoflow.ui.components.label
 import java.util.Calendar
 
+/** Real counts only — every number here comes from stored automations and runs. */
+private fun healthLine(state: HomeUiState): String = buildList {
+    if (state.healthyCount > 0) add("${state.healthyCount} healthy")
+    if (state.needsAttentionCount > 0) add("${state.needsAttentionCount} need attention")
+    if (state.disabledCount > 0) add("${state.disabledCount} disabled")
+}.joinToString(" · ").ifBlank { "No automations yet" }
+
 @Composable
 fun HomeScreen(
     onCreateAutomation: () -> Unit,
@@ -89,6 +96,19 @@ fun HomeScreen(
                 value = state.runsToday.toString(),
                 label = "Runs today",
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (state.totalCount > 0) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Text(
+                text = healthLine(state),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (state.needsAttentionCount > 0) {
+                    MaterialTheme.colorScheme.tertiary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                }
             )
         }
 

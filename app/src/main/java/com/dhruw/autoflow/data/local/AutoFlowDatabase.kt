@@ -15,9 +15,14 @@ import com.dhruw.autoflow.data.local.entity.NotificationRecordEntity
 
 /**
  * Version 1 is the initial schema (exported to app/schemas); version 2 adds
- * the notification_records table. Future versions must ship explicit
- * migrations — no destructive fallback is configured, so a missing migration
- * fails loudly in development instead of wiping user data.
+ * the notification_records table; version 3 adds the per-automation
+ * consecutive-failure auto-disable threshold. Future versions must ship
+ * explicit migrations — no destructive fallback is configured, so a missing
+ * migration fails loudly in development instead of wiping user data.
+ *
+ * Workflow contents (triggers, conditions, actions, and everything Phase 8
+ * added: variables, branches, disabled steps, group labels) ride inside the
+ * existing JSON TEXT columns and never require a schema change.
  */
 @Database(
     entities = [
@@ -25,7 +30,7 @@ import com.dhruw.autoflow.data.local.entity.NotificationRecordEntity
         ExecutionEntity::class,
         NotificationRecordEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 abstract class AutoFlowDatabase : RoomDatabase() {
@@ -38,6 +43,9 @@ abstract class AutoFlowDatabase : RoomDatabase() {
 
     companion object {
         private const val NAME = "autoflow.db"
+
+        /** Kept in step with the @Database annotation; shown in Diagnostics. */
+        const val SCHEMA_VERSION = 3
 
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
@@ -62,6 +70,14 @@ abstract class AutoFlowDatabase : RoomDatabase() {
             }
         }
 
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE `automations` ADD COLUMN `disable_after_failures` INTEGER DEFAULT NULL"
+                )
+            }
+        }
+
         @Volatile
         private var instance: AutoFlowDatabase? = null
 
@@ -72,7 +88,7 @@ abstract class AutoFlowDatabase : RoomDatabase() {
                     AutoFlowDatabase::class.java,
                     NAME
                 )
-                    .addMigrations(MIGRATION_1_2)
+                    .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
                     .build()
                     .also { instance = it }
             }
