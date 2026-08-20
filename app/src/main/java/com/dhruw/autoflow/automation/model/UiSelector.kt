@@ -27,7 +27,10 @@ data class UiSelector(
     /**
      * True when this node's attributes satisfy every constraint. viewId and
      * className compare exactly (case-insensitive); text and contentDescription
-     * use [matchMode].
+     * use [matchMode]. A viewId without a package prefix ("send_button")
+     * also matches the id part of a full Android resource name
+     * ("com.example:id/send_button") so users can copy either form from the
+     * inspector.
      */
     fun matches(
         nodeViewId: String?,
@@ -35,7 +38,7 @@ data class UiSelector(
         nodeText: String?,
         nodeClassName: String?
     ): Boolean {
-        if (viewId.isNotBlank() && !equalsIgnoreCase(nodeViewId, viewId)) return false
+        if (viewId.isNotBlank() && !viewIdMatches(nodeViewId)) return false
         if (className.isNotBlank() && !equalsIgnoreCase(nodeClassName, className)) return false
         if (contentDescription.isNotBlank() &&
             !matchMode.matches(nodeContentDescription.orEmpty(), contentDescription)
@@ -46,6 +49,18 @@ data class UiSelector(
 
     private fun equalsIgnoreCase(value: String?, expected: String): Boolean =
         value != null && value.trim().equals(expected.trim(), ignoreCase = true)
+
+    private fun viewIdMatches(nodeViewId: String?): Boolean {
+        if (nodeViewId == null) return false
+        if (equalsIgnoreCase(nodeViewId, viewId)) return true
+        // Bare id ("send_button") against a full resource name — compare the
+        // part after "id/". Never the other way round: a full selector id
+        // must match the full node id.
+        if (!viewId.contains(':') && !viewId.contains('/')) {
+            return equalsIgnoreCase(nodeViewId.trim().substringAfterLast('/'), viewId)
+        }
+        return false
+    }
 
     val summary: String
         get() {

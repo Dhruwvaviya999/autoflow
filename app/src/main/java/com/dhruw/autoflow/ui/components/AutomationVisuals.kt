@@ -92,6 +92,7 @@ val Action.icon: ImageVector
         is Action.RenameFileAction -> Icons.Outlined.DriveFileRenameOutline
         is Action.InstagramAnalysisAction -> Icons.Outlined.PersonSearch
         is Action.SaveNotificationAction -> Icons.Outlined.Save
+        is Action.UiAutomationAction -> Icons.Outlined.TouchApp
     }
 
 val ExecutionStatus.icon: ImageVector

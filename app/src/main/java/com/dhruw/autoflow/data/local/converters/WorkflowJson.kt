@@ -4,8 +4,11 @@ import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
 import com.dhruw.autoflow.automation.model.ConnectionEvent
 import com.dhruw.autoflow.automation.model.LevelComparison
+import com.dhruw.autoflow.automation.model.ScrollDirection
 import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
+import com.dhruw.autoflow.automation.model.UiSelector
+import com.dhruw.autoflow.automation.model.UiStep
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -61,6 +64,16 @@ object WorkflowJson {
     private const val ACTION_RENAME_FILE = "rename_file"
     private const val ACTION_INSTAGRAM_ANALYSIS = "instagram_analysis"
     private const val ACTION_SAVE_NOTIFICATION = "save_notification"
+    private const val ACTION_UI_AUTOMATION = "ui_automation"
+    private const val STEP_LAUNCH_APP = "launch_app"
+    private const val STEP_WAIT = "wait"
+    private const val STEP_WAIT_FOR_ELEMENT = "wait_for_element"
+    private const val STEP_CLICK = "click"
+    private const val STEP_LONG_CLICK = "long_click"
+    private const val STEP_SET_TEXT = "set_text"
+    private const val STEP_SCROLL = "scroll"
+    private const val STEP_GLOBAL_BACK = "global_back"
+    private const val STEP_REQUIRE_CONFIRMATION = "require_confirmation"
 
     // --- Trigger ---
 
@@ -319,6 +332,14 @@ object WorkflowJson {
             ACTION_RENAME_FILE -> Action.RenameFileAction(newName = json.getString("newName"))
             ACTION_INSTAGRAM_ANALYSIS -> Action.InstagramAnalysisAction
             ACTION_SAVE_NOTIFICATION -> Action.SaveNotificationAction
+            ACTION_UI_AUTOMATION -> Action.UiAutomationAction(
+                targetPackage = json.getString("targetPackage"),
+                targetLabel = json.optString("targetLabel", ""),
+                overallTimeoutMillis = json.optLong("overallTimeoutMillis", 60_000),
+                steps = json.getJSONArray("steps").let { arr ->
+                    List(arr.length()) { decodeUiStep(arr.getJSONObject(it)) }
+                }
+            )
             else -> throw WorkflowJsonException("Unknown action type: $type")
         }
     }
@@ -349,6 +370,94 @@ object WorkflowJson {
             .put(KEY_TYPE, ACTION_INSTAGRAM_ANALYSIS)
         is Action.SaveNotificationAction -> JSONObject()
             .put(KEY_TYPE, ACTION_SAVE_NOTIFICATION)
+        is Action.UiAutomationAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_UI_AUTOMATION)
+            .put("targetPackage", action.targetPackage)
+            .put("targetLabel", action.targetLabel)
+            .put("overallTimeoutMillis", action.overallTimeoutMillis)
+            .put("steps", JSONArray(action.steps.map(::uiStepToJson)))
+    }
+
+    // --- UI steps ---
+
+    private fun decodeUiStep(json: JSONObject): UiStep =
+        when (val type = json.getString(KEY_TYPE)) {
+            STEP_LAUNCH_APP -> UiStep.LaunchApp(
+                packageName = json.getString("packageName"),
+                appLabel = json.optString("appLabel", "")
+            )
+            STEP_WAIT -> UiStep.Wait(durationMillis = json.getLong("durationMillis"))
+            STEP_WAIT_FOR_ELEMENT -> UiStep.WaitForElement(
+                selector = decodeSelector(json.getJSONObject("selector")),
+                timeoutMillis = json.optLong("timeoutMillis", 10_000)
+            )
+            STEP_CLICK -> UiStep.ClickElement(decodeSelector(json.getJSONObject("selector")))
+            STEP_LONG_CLICK -> UiStep.LongClickElement(decodeSelector(json.getJSONObject("selector")))
+            STEP_SET_TEXT -> UiStep.SetText(
+                selector = decodeSelector(json.getJSONObject("selector")),
+                text = json.getString("text")
+            )
+            STEP_SCROLL -> UiStep.Scroll(
+                selector = decodeSelector(json.getJSONObject("selector")),
+                direction = ScrollDirection.valueOf(json.getString("direction"))
+            )
+            STEP_GLOBAL_BACK -> UiStep.GlobalBack
+            STEP_REQUIRE_CONFIRMATION -> UiStep.RequireUserConfirmation(
+                prompt = json.optString("prompt", ""),
+                nextActionLabel = json.optString("nextActionLabel", "")
+            )
+            else -> throw WorkflowJsonException("Unknown UI step type: $type")
+        }
+
+    private fun uiStepToJson(step: UiStep): JSONObject = when (step) {
+        is UiStep.LaunchApp -> JSONObject()
+            .put(KEY_TYPE, STEP_LAUNCH_APP)
+            .put("packageName", step.packageName)
+            .put("appLabel", step.appLabel)
+        is UiStep.Wait -> JSONObject()
+            .put(KEY_TYPE, STEP_WAIT)
+            .put("durationMillis", step.durationMillis)
+        is UiStep.WaitForElement -> JSONObject()
+            .put(KEY_TYPE, STEP_WAIT_FOR_ELEMENT)
+            .put("selector", selectorToJson(step.selector))
+            .put("timeoutMillis", step.timeoutMillis)
+        is UiStep.ClickElement -> JSONObject()
+            .put(KEY_TYPE, STEP_CLICK)
+            .put("selector", selectorToJson(step.selector))
+        is UiStep.LongClickElement -> JSONObject()
+            .put(KEY_TYPE, STEP_LONG_CLICK)
+            .put("selector", selectorToJson(step.selector))
+        is UiStep.SetText -> JSONObject()
+            .put(KEY_TYPE, STEP_SET_TEXT)
+            .put("selector", selectorToJson(step.selector))
+            .put("text", step.text)
+        is UiStep.Scroll -> JSONObject()
+            .put(KEY_TYPE, STEP_SCROLL)
+            .put("selector", selectorToJson(step.selector))
+            .put("direction", step.direction.name)
+        is UiStep.GlobalBack -> JSONObject().put(KEY_TYPE, STEP_GLOBAL_BACK)
+        is UiStep.RequireUserConfirmation -> JSONObject()
+            .put(KEY_TYPE, STEP_REQUIRE_CONFIRMATION)
+            .put("prompt", step.prompt)
+            .put("nextActionLabel", step.nextActionLabel)
+    }
+
+    private fun decodeSelector(json: JSONObject): UiSelector = UiSelector(
+        viewId = json.optString("viewId", ""),
+        contentDescription = json.optString("contentDescription", ""),
+        text = json.optString("text", ""),
+        className = json.optString("className", ""),
+        matchMode = TextMatchMode.valueOf(json.optString("matchMode", TextMatchMode.EQUALS.name)),
+        occurrence = if (json.has("occurrence")) json.getInt("occurrence") else null
+    )
+
+    private fun selectorToJson(selector: UiSelector): JSONObject = JSONObject().apply {
+        put("viewId", selector.viewId)
+        put("contentDescription", selector.contentDescription)
+        put("text", selector.text)
+        put("className", selector.className)
+        put("matchMode", selector.matchMode.name)
+        selector.occurrence?.let { put("occurrence", it) }
     }
 
     // --- Log lines (not polymorphic, but stored the same way) ---

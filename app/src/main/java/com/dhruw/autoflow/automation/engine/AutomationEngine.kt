@@ -74,7 +74,8 @@ class AutomationEngine(
             log = { line -> logs += line },
             fileEvent = payload as? TriggerPayload.FileEvent,
             notificationEvent = payload as? TriggerPayload.NotificationEvent,
-            automationId = automation.id
+            automationId = automation.id,
+            payload = payload
         )
 
         try {

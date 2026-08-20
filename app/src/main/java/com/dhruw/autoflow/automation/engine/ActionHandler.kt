@@ -17,7 +17,9 @@ class ActionContext(
     val log: (String) -> Unit,
     val fileEvent: com.dhruw.autoflow.automation.model.TriggerPayload.FileEvent? = null,
     val notificationEvent: com.dhruw.autoflow.automation.model.TriggerPayload.NotificationEvent? = null,
-    val automationId: String? = null
+    val automationId: String? = null,
+    /** The run's raw trigger payload (any kind) — feeds UI automation templates. */
+    val payload: com.dhruw.autoflow.automation.model.TriggerPayload? = null
 )
 
 /**

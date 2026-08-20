@@ -1,5 +1,6 @@
 package com.dhruw.autoflow.ui
 
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -14,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -30,6 +32,8 @@ import com.dhruw.autoflow.ui.home.HomeScreen
 import com.dhruw.autoflow.ui.instagram.InstagramAnalyzerScreen
 import com.dhruw.autoflow.ui.instagram.InstagramAnalyzerViewModel
 import com.dhruw.autoflow.ui.instagram.InstagramResultsScreen
+import com.dhruw.autoflow.ui.components.UiAutomationSessionHost
+import com.dhruw.autoflow.ui.inspector.UiInspectorScreen
 import com.dhruw.autoflow.ui.navigation.TopLevelDestination
 import com.dhruw.autoflow.ui.settings.SettingsScreen
 import kotlinx.coroutines.launch
@@ -37,6 +41,7 @@ import kotlinx.coroutines.launch
 private const val EDITOR_ROUTE = "editor?automationId={automationId}"
 private const val INSTAGRAM_ROUTE = "instagram"
 private const val INSTAGRAM_RESULTS_ROUTE = "instagram/results"
+private const val INSPECTOR_ROUTE = "inspector"
 
 private fun editorRoute(automationId: String? = null): String =
     if (automationId == null) "editor" else "editor?automationId=$automationId"
@@ -50,7 +55,8 @@ fun AutoFlowApp() {
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     val onEditorScreen = currentRoute?.startsWith("editor") == true ||
-        currentRoute?.startsWith(INSTAGRAM_ROUTE) == true
+        currentRoute?.startsWith(INSTAGRAM_ROUTE) == true ||
+        currentRoute == INSPECTOR_ROUTE
 
     val showMessage: (String) -> Unit = { message ->
         scope.launch { snackbarHostState.showSnackbar(message) }
@@ -97,11 +103,11 @@ fun AutoFlowApp() {
             }
         }
     ) { innerPadding ->
-        NavHost(
-            navController = navController,
-            startDestination = TopLevelDestination.HOME.route,
-            modifier = Modifier.padding(innerPadding)
-        ) {
+        Box(modifier = Modifier.padding(innerPadding)) {
+            NavHost(
+                navController = navController,
+                startDestination = TopLevelDestination.HOME.route
+            ) {
             composable(TopLevelDestination.HOME.route) {
                 HomeScreen(
                     onCreateAutomation = { navController.navigate(editorRoute()) },
@@ -119,7 +125,12 @@ fun AutoFlowApp() {
                 HistoryScreen()
             }
             composable(TopLevelDestination.SETTINGS.route) {
-                SettingsScreen()
+                SettingsScreen(
+                    onOpenInspector = { navController.navigate(INSPECTOR_ROUTE) }
+                )
+            }
+            composable(INSPECTOR_ROUTE) {
+                UiInspectorScreen(onBack = { navController.popBackStack() })
             }
             composable(
                 route = EDITOR_ROUTE,
@@ -157,6 +168,13 @@ fun AutoFlowApp() {
                     viewModel = vm
                 )
             }
+            }
+
+            // Live progress + confirmation for a running UI automation,
+            // shown above whatever screen is open.
+            UiAutomationSessionHost(
+                modifier = Modifier.align(Alignment.BottomCenter)
+            )
         }
     }
 }

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Deliberately minimal configuration (Phase 7):
+  - Only two event types. typeWindowStateChanged tracks the foreground
+    package for the target-package boundary; typeViewClicked feeds the
+    user-started element inspector. Element lookup during a run polls the
+    active window directly and needs no events, so high-frequency content
+    events (typeWindowContentChanged etc.) are NOT requested.
+  - canRetrieveWindowContent is required to find and act on nodes.
+  - flagReportViewIds exposes view IDs, the most stable selector type.
+  - No canPerformGestures: interaction is semantic (ACTION_CLICK/SET_TEXT),
+    never coordinate injection. No canRequestFilterKeyEvents, no fingerprint,
+    no screenshot capability.
+  - notificationTimeout throttles event delivery to keep idle overhead low.
+-->
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeViewClicked"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagDefault|flagReportViewIds|flagIncludeNotImportantViews"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="100" />

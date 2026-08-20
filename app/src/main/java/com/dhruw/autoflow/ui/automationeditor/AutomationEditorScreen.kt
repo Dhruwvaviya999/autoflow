@@ -114,6 +114,7 @@ private sealed interface EditorDialog {
     data class CopyFile(val index: Int?) : EditorDialog
     data class MoveFile(val index: Int?) : EditorDialog
     data class RenameFile(val index: Int?) : EditorDialog
+    data class UiAutomation(val index: Int?) : EditorDialog
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -268,6 +269,7 @@ fun AutomationEditorScreen(
                             is Action.RenameFileAction -> EditorDialog.RenameFile(index)
                             is Action.InstagramAnalysisAction -> null
                             is Action.SaveNotificationAction -> null
+                            is Action.UiAutomationAction -> EditorDialog.UiAutomation(index)
                         }
                     },
                     onDelete = { viewModel.removeAction(index) }
@@ -457,6 +459,9 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.Save, "Save notification", "Keep the triggering notification on this device") {
                     viewModel.addAction(Action.SaveNotificationAction)
+                },
+                PickerOption(Icons.Outlined.TouchApp, "UI Automation", "Tap, type and navigate inside another app") {
+                    dialog = EditorDialog.UiAutomation(index = null)
                 }
             ),
             onDismiss = { sheet = null }
@@ -678,6 +683,16 @@ fun AutomationEditorScreen(
 
         is EditorDialog.RenameFile -> RenameFileActionDialog(
             initial = d.index?.let { state.actions[it] as Action.RenameFileAction },
+            onDismiss = { dialog = null },
+            onConfirm = { action ->
+                if (d.index == null) viewModel.addAction(action)
+                else viewModel.updateAction(d.index, action)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.UiAutomation -> UiAutomationEditorDialog(
+            initial = d.index?.let { state.actions[it] as Action.UiAutomationAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)
