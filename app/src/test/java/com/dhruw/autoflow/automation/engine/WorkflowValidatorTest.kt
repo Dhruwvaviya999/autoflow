@@ -46,6 +46,14 @@ class WorkflowValidatorTest {
     }
 
     @Test
+    fun `an empty workflow is not also reported as group-labels-only`() {
+        val report = validator.validate(automation(actions = emptyList()))
+
+        assertTrue(report.errors.any { it.message.contains("at least one action") })
+        assertFalse(report.errors.any { it.message.contains("group labels") })
+    }
+
+    @Test
     fun `a workflow without a name is an error`() {
         assertFalse(validator.validate(automation(name = " ")).isValid)
     }

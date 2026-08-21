@@ -45,7 +45,7 @@ class AutomationRunner(
             automationRepository.markRun(automation.id, result.startedAt)
         }
         if (result.status == ExecutionStatus.FAILED) {
-            withContext(NonCancellable) { applyAutoDisablePolicy(automation) }
+            withContext(NonCancellable) { applyAutoDisablePolicy(automation, result) }
         }
         return result
     }
@@ -54,14 +54,20 @@ class AutomationRunner(
      * Switches the automation off once it has failed [Automation.disableAfterFailures]
      * times in a row. Counting uses the same rule as the health indicator, so
      * what the user sees on the card matches what triggers the policy.
+     *
+     * [latest] is the run that just failed. It is prepended explicitly instead
+     * of being read back from [ExecutionRepository.executions]: that flow is
+     * fed by the database and has usually not emitted the new row yet when we
+     * get here, which would make a threshold of 3 only fire on the 4th failure.
      */
-    private suspend fun applyAutoDisablePolicy(automation: Automation) {
+    private suspend fun applyAutoDisablePolicy(automation: Automation, latest: Execution) {
         val threshold = automation.disableAfterFailures ?: return
         if (threshold <= 0) return
 
-        val recent = executionRepository.executions.value
-            .filter { it.automationId == automation.id }
-        val failures = healthCalculator.countConsecutiveFailures(recent)
+        val earlier = executionRepository.executions.value
+            .filter { it.automationId == automation.id && it.id != latest.id }
+        // executions is newest-first and `latest` is newer than all of them.
+        val failures = healthCalculator.countConsecutiveFailures(listOf(latest) + earlier)
         if (failures < threshold) return
 
         automationRepository.setEnabled(automation.id, false)

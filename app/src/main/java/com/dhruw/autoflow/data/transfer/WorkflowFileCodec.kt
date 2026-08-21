@@ -54,6 +54,15 @@ object WorkflowFileCodec {
     const val FILE_EXTENSION = "autoflow"
     const val MIME_TYPE = "application/json"
 
+    /**
+     * MIME used when asking the storage picker to create the file. The
+     * content is JSON, but DocumentsUI rewrites the display name to match
+     * the type it is given — with "application/json" it saves
+     * "My workflow.autoflow.json". A type with no registered extension
+     * leaves the ".autoflow" name the user was shown intact.
+     */
+    const val CREATE_DOCUMENT_MIME_TYPE = "application/octet-stream"
+
     private const val KEY_FORMAT = "format"
     private const val KEY_SCHEMA_VERSION = "schemaVersion"
     private const val KEY_KIND = "kind"

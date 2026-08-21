@@ -2,6 +2,7 @@ package com.dhruw.autoflow.ui.automationeditor
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -264,7 +265,10 @@ fun BranchActionDialog(
                     }
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     BranchConditionKind.entries.take(3).forEach { candidate ->
                         FilterChip(
                             selected = false,
@@ -273,7 +277,10 @@ fun BranchActionDialog(
                         )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     BranchConditionKind.entries.drop(3).forEach { candidate ->
                         FilterChip(
                             selected = false,
@@ -331,7 +338,10 @@ private fun BranchActionList(
             }
         }
     }
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         FilterChip(selected = false, onClick = { onAdd(BranchInnerKind.NOTIFICATION) },
             label = { Text("+ Notify", style = MaterialTheme.typography.labelSmall) })
         FilterChip(selected = false, onClick = { onAdd(BranchInnerKind.DELAY) },
@@ -358,7 +368,10 @@ private fun BranchBatteryConditionDialog(
         title = { Text("Battery level") },
         text = {
             Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
                     listOf(LevelComparison.LESS_OR_EQUAL, LevelComparison.GREATER_OR_EQUAL).forEach { c ->
                         FilterChip(
                             selected = comparison == c,

@@ -63,7 +63,9 @@ class WorkflowValidator {
                 "This workflow has ${automation.actions.size} steps — the limit is ${EngineLimits.MAX_ACTIONS}."
             )
         }
-        if (automation.actions.all { it.unwrapped is Action.GroupMarker }) {
+        if (automation.actions.isNotEmpty() &&
+            automation.actions.all { it.unwrapped is Action.GroupMarker }
+        ) {
             issues += ValidationIssue(
                 IssueSeverity.ERROR,
                 "This workflow only has group labels — add a step that does something."

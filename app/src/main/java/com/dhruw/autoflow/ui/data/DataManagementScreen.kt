@@ -85,7 +85,7 @@ fun DataManagementScreen(
     var pendingDanger by remember { mutableStateOf<DangerAction?>(null) }
 
     val backupLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(WorkflowFileCodec.MIME_TYPE)
+        ActivityResultContracts.CreateDocument(WorkflowFileCodec.CREATE_DOCUMENT_MIME_TYPE)
     ) { uri -> uri?.let(viewModel::backup) }
 
     val importLauncher = rememberLauncherForActivityResult(

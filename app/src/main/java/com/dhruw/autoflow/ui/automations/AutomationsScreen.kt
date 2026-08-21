@@ -84,7 +84,7 @@ fun AutomationsScreen(
     var exportTarget by remember { mutableStateOf<String?>(null) }
 
     val exportLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.CreateDocument(WorkflowFileCodec.MIME_TYPE)
+        ActivityResultContracts.CreateDocument(WorkflowFileCodec.CREATE_DOCUMENT_MIME_TYPE)
     ) { uri ->
         if (uri != null) {
             val target = exportTarget
