@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Themed-icon (Android 13+) layer. Only the alpha channel is used - the
+  system recolours the glyph to match the wallpaper palette - so the fill
+  colour here is arbitrary and the shape is kept flat. Same geometry as
+  ic_launcher_foreground, minus the light ramp.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <path
+        android:fillColor="#FF000000"
+        android:pathData="M59.8,25 L33.7,59.8 L51.1,59.8 L48.2,83 L74.3,48.2 L56.9,48.2 Z" />
+</vector>
