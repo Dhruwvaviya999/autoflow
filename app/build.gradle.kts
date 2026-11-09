@@ -31,6 +31,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            signingConfig = signingConfigs.getByName("debug")
             // No signingConfig here: release signing is left to a local
             // keystore supplied at build time. Keys are never committed.
         }
