@@ -43,6 +43,7 @@ import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.SpeakQueueMode
 import com.dhruw.autoflow.automation.model.SpeakStream
 import com.dhruw.autoflow.automation.model.Trigger
+import com.dhruw.autoflow.automation.model.MAX_SPEAK_VOICE_CHOICES
 import com.dhruw.autoflow.automation.model.speakVoiceLabel
 import kotlinx.coroutines.launch
 import java.util.Locale
@@ -180,7 +181,8 @@ fun SpeakActionDialog(
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
-                val available = voices
+                // The engine can install far more than anyone wants to scroll.
+                val available = voices?.take(MAX_SPEAK_VOICE_CHOICES)
                 PickerField(
                     label = "Voice",
                     value = voiceName,
@@ -194,7 +196,7 @@ fun SpeakActionDialog(
                     supporting = when {
                         available == null -> "Reading the installed voices..."
                         available.isEmpty() -> "No offline voice is installed for this language"
-                        else -> "Preview each one to hear which is which"
+                        else -> "Names are just handles - preview one to hear it"
                     }
                 )
 

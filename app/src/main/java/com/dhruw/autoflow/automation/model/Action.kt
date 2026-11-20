@@ -183,7 +183,8 @@ val Action.summary: String
         is Action.SpeakAction -> buildString {
             append("Speak \"").append(text.trim().ifBlank { "empty" }).append("\"")
             if (voiceName.isNotBlank()) {
-                append(" (").append(speakVoiceGenderLabel(voiceName) ?: "custom voice").append(")")
+                val voice = speakVoiceGender(voiceName)?.let { "$it voice" } ?: "custom voice"
+                append(" (").append(voice).append(")")
             } else if (languageTag.isNotBlank()) {
                 append(" (").append(languageTag).append(")")
             }
