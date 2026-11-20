@@ -182,8 +182,11 @@ val Action.summary: String
         }
         is Action.SpeakAction -> buildString {
             append("Speak \"").append(text.trim().ifBlank { "empty" }).append("\"")
-            if (voiceName.isNotBlank()) append(" (").append(voiceName).append(")")
-            else if (languageTag.isNotBlank()) append(" (").append(languageTag).append(")")
+            if (voiceName.isNotBlank()) {
+                append(" (").append(speakVoiceGenderLabel(voiceName) ?: "custom voice").append(")")
+            } else if (languageTag.isNotBlank()) {
+                append(" (").append(languageTag).append(")")
+            }
             if (stream != SpeakStream.NOTIFICATION) append(" · ").append(stream.label)
             if (queueMode != SpeakQueueMode.INTERRUPT) append(" · ").append(queueMode.label)
             if (pitch != 1.0f || speechRate != 1.0f || volume != 1.0f) append(" · tuned voice")

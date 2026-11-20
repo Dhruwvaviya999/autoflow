@@ -27,6 +27,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -41,6 +42,8 @@ import com.dhruw.autoflow.automation.engine.TemplateResolver
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.SpeakQueueMode
 import com.dhruw.autoflow.automation.model.SpeakStream
+import com.dhruw.autoflow.automation.model.Trigger
+import com.dhruw.autoflow.automation.model.speakVoiceLabel
 import kotlinx.coroutines.launch
 import java.util.Locale
 
@@ -68,9 +71,6 @@ private val OFFERED_LANGUAGES = listOf(
     "zh-CN" to "Chinese (Mandarin)"
 )
 
-/** Placeholders a Speak step can carry, offered as one-tap chips. */
-private val TEMPLATE_CHIPS = listOf("automation.name") + TemplateResolver.supportedVariables
-
 /**
  * A template cannot resolve in the editor — there is no run to read a battery
  * level from — so a preview speaks each placeholder's own name instead of
@@ -81,20 +81,25 @@ internal fun speakPreviewText(template: String): String =
         .replace(template) { match -> match.groupValues[1].replace('.', ' ') }
 
 /**
- * Editor for a Speak step: the text, the language, and volume, pitch and rate.
+ * Editor for a Speak step: the text, the language, a specific installed voice,
+ * and volume, pitch and rate.
  * Preview plays the current settings through the same shared engine the
  * automation will use, because hearing a voice setting is the only honest way
  * to judge it.
  *
- * [Action.SpeakAction] also carries a specific voice, an audio stream, a queue
- * mode and a skip-on-silent flag. The editor deliberately offers none of the
- * four and leaves each at its default, but an action that arrives with them
+ * The placeholder chips are narrowed to what [trigger] will actually deliver,
+ * so tapping one can never build a template this automation cannot resolve.
+ *
+ * [Action.SpeakAction] also carries an audio stream, a queue mode and a
+ * skip-on-silent flag. The editor deliberately offers none of the three and
+ * leaves each at its default, but an action that arrives with them
  * set — from an imported workflow — keeps those values through an edit here.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SpeakActionDialog(
     initial: Action.SpeakAction?,
+    trigger: Trigger?,
     onDismiss: () -> Unit,
     onConfirm: (Action.SpeakAction) -> Unit
 ) {
@@ -104,6 +109,7 @@ fun SpeakActionDialog(
 
     var text by rememberSaveable { mutableStateOf(initial?.text ?: "") }
     var languageTag by rememberSaveable { mutableStateOf(initial?.languageTag ?: "") }
+    var voiceName by rememberSaveable { mutableStateOf(initial?.voiceName ?: "") }
     var volume by rememberSaveable { mutableStateOf(initial?.volume ?: 1f) }
     var pitch by rememberSaveable { mutableStateOf(initial?.pitch ?: 1f) }
     var speechRate by rememberSaveable { mutableStateOf(initial?.speechRate ?: 1f) }
@@ -112,8 +118,18 @@ fun SpeakActionDialog(
     }
     var previewing by remember { mutableStateOf(false) }
 
+    // automation.name resolves on every run; the rest depend on the trigger.
+    val chips = remember(trigger) {
+        listOf("automation.name") + TemplateResolver.payloadVariablesFor(trigger)
+    }
+
+    // Reloaded on every language change, so the picker only ever lists voices
+    // that can speak the chosen one. null while the engine is still starting.
+    val voices by produceState<List<String>?>(initialValue = null, languageTag) {
+        value = tts.offlineVoiceNames(languageTag)
+    }
+
     // Not editable here; carried through so an imported action keeps them.
-    val voiceName = initial?.voiceName ?: ""
     val stream = initial?.stream ?: SpeakStream.NOTIFICATION
     val queueMode = initial?.queueMode ?: SpeakQueueMode.INTERRUPT
     val skipIfSilent = initial?.skipIfSilent ?: false
@@ -137,7 +153,7 @@ fun SpeakActionDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
-                    TEMPLATE_CHIPS.forEach { name ->
+                    chips.forEach { name ->
                         SuggestionChip(
                             onClick = { text = appendTemplate(text, name) },
                             label = {
@@ -156,7 +172,30 @@ fun SpeakActionDialog(
                         OFFERED_LANGUAGES.firstOrNull { it.first == tag }?.second
                             ?: tag.ifBlank { "System default" }
                     },
-                    onPick = { languageTag = it }
+                    onPick = { picked ->
+                        languageTag = picked
+                        // The old pick belongs to the old language's voice list.
+                        voiceName = ""
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+                val available = voices
+                PickerField(
+                    label = "Voice",
+                    value = voiceName,
+                    options = listOf("") + available.orEmpty(),
+                    labelOf = { name ->
+                        if (name.isBlank()) "Engine default"
+                        else speakVoiceLabel(name, available.orEmpty().indexOf(name) + 1)
+                    },
+                    onPick = { voiceName = it },
+                    enabled = !available.isNullOrEmpty(),
+                    supporting = when {
+                        available == null -> "Reading the installed voices..."
+                        available.isEmpty() -> "No offline voice is installed for this language"
+                        else -> "Preview each one to hear which is which"
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -254,23 +293,36 @@ private fun <T> PickerField(
     value: T,
     options: List<T>,
     labelOf: (T) -> String,
-    onPick: (T) -> Unit
+    onPick: (T) -> Unit,
+    enabled: Boolean = true,
+    supporting: String? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
+    val open = expanded && enabled
 
-    ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { expanded = it }) {
+    ExposedDropdownMenuBox(
+        expanded = open,
+        onExpandedChange = { if (enabled) expanded = it }
+    ) {
         OutlinedTextField(
             value = labelOf(value),
             onValueChange = {},
             readOnly = true,
+            enabled = enabled,
             label = { Text(label) },
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+            supportingText = supporting?.let { note ->
+                { Text(note, style = MaterialTheme.typography.labelSmall) }
+            },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = open) },
             modifier = Modifier
-                .menuAnchor(type = ExposedDropdownMenuAnchorType.PrimaryNotEditable, enabled = true)
+                .menuAnchor(
+                    type = ExposedDropdownMenuAnchorType.PrimaryNotEditable,
+                    enabled = enabled
+                )
                 .fillMaxWidth(),
             colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors()
         )
-        ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { expanded = false }) {
             options.forEach { option ->
                 DropdownMenuItem(
                     text = { Text(labelOf(option)) },

@@ -1,6 +1,8 @@
 package com.dhruw.autoflow.automation.engine
 
+import com.dhruw.autoflow.automation.model.LevelComparison
 import com.dhruw.autoflow.automation.model.SystemEvent
+import com.dhruw.autoflow.automation.model.Trigger
 import com.dhruw.autoflow.automation.model.TriggerPayload
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -26,6 +28,83 @@ class TemplateResolverTest {
         sizeBytes = 100,
         detectedAt = 1L
     )
+
+    @Test
+    fun `payload variables are offered per trigger`() {
+        assertEquals(
+            listOf(
+                "notification.title", "notification.text",
+                "notification.appName", "notification.packageName"
+            ),
+            TemplateResolver.payloadVariablesFor(
+                Trigger.NotificationTrigger()
+            )
+        )
+        assertEquals(
+            listOf("file.name", "file.extension"),
+            TemplateResolver.payloadVariablesFor(Trigger.FileTrigger(folderUri = "content://x", folderLabel = "Files"))
+        )
+        assertEquals(
+            listOf("battery.level", "battery.charging"),
+            TemplateResolver.payloadVariablesFor(Trigger.ChargingStateTrigger(onCharging = true))
+        )
+        assertEquals(
+            listOf("battery.level", "battery.charging"),
+            TemplateResolver.payloadVariablesFor(
+                Trigger.BatteryLevelTrigger(LevelComparison.LESS_OR_EQUAL, 20)
+            )
+        )
+    }
+
+    @Test
+    fun `triggers that carry no payload offer no variables`() {
+        assertEquals(emptyList<String>(), TemplateResolver.payloadVariablesFor(Trigger.ManualTrigger))
+        assertEquals(emptyList<String>(), TemplateResolver.payloadVariablesFor(Trigger.DeviceBootTrigger))
+        assertEquals(
+            emptyList<String>(),
+            TemplateResolver.payloadVariablesFor(
+                Trigger.TimeTrigger(hour = 8, minute = 0, repeat = Trigger.TimeTrigger.Repeat.DAILY)
+            )
+        )
+        // No trigger chosen yet, as the editor sees a brand-new automation.
+        assertEquals(emptyList<String>(), TemplateResolver.payloadVariablesFor(null))
+    }
+
+    @Test
+    fun `every offered variable actually resolves against that trigger's payload`() {
+        // Guards the offer list against drifting away from valuesFor: a name
+        // the editor offers but the payload never fills would only surface as
+        // a failed run.
+        val cases = listOf(
+            Trigger.NotificationTrigger() to notification,
+            Trigger.FileTrigger(folderUri = "content://x", folderLabel = "Files") to file,
+            Trigger.ChargingStateTrigger(onCharging = true) to
+                SystemEvent.ChargingChanged(isCharging = true, batteryLevel = 80, timestamp = 1L),
+            Trigger.BatteryLevelTrigger(LevelComparison.LESS_OR_EQUAL, 20) to
+                SystemEvent.BatteryChanged(level = 15, previousLevel = 25, isCharging = false, timestamp = 1L)
+        )
+        for ((trigger, payload) in cases) {
+            for (name in TemplateResolver.payloadVariablesFor(trigger)) {
+                val result = TemplateResolver.resolve("{{$name}}", payload)
+                assertTrue(
+                    "$name should resolve for $trigger but was $result",
+                    result is TemplateResolver.Result.Ok
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `an offered variable is always one the language supports`() {
+        val offered = listOf(
+            Trigger.NotificationTrigger(),
+            Trigger.FileTrigger(folderUri = "content://x", folderLabel = "Files"),
+            Trigger.ChargingStateTrigger(onCharging = true)
+        ).flatMap { TemplateResolver.payloadVariablesFor(it) }
+
+        assertTrue(offered.isNotEmpty())
+        assertTrue(TemplateResolver.supportedVariables.containsAll(offered))
+    }
 
     @Test
     fun `static text passes through unchanged`() {

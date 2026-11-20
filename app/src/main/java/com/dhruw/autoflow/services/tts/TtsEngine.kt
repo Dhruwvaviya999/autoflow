@@ -95,6 +95,28 @@ class TtsEngine(private val context: Context) {
         }
     }
 
+    /**
+     * Voices the engine can use offline for [languageTag] (every offline voice
+     * when it is blank), sorted by name so the editor's position-based labels
+     * stay stable between openings. Network voices are left out: AutoFlow
+     * holds no internet permission, so one would never produce sound.
+     */
+    suspend fun offlineVoiceNames(languageTag: String = ""): List<String> = mutex.withLock {
+        val tts = ensureEngine() ?: return emptyList()
+        val language = languageTag.takeIf { it.isNotBlank() }
+            ?.let { Locale.forLanguageTag(it).language }
+            ?.takeIf { it.isNotBlank() }
+        return runCatching { tts.voices }.getOrNull().orEmpty()
+            .asSequence()
+            .filterNotNull()
+            .filter { !it.isNetworkConnectionRequired }
+            .filter { language == null || it.locale.language == language }
+            .map { it.name }
+            .distinct()
+            .sorted()
+            .toList()
+    }
+
     /** Cut off whatever is speaking — used when the editor's preview is dismissed. */
     fun stop() {
         runCatching { engine?.stop() }

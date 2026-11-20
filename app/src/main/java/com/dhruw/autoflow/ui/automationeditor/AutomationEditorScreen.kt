@@ -789,6 +789,7 @@ fun AutomationEditorScreen(
 
         is EditorDialog.Speak -> SpeakActionDialog(
             initial = d.index?.let { state.actions[it].unwrapped as Action.SpeakAction },
+            trigger = state.trigger,
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)

@@ -1,5 +1,6 @@
 package com.dhruw.autoflow.automation.engine
 
+import com.dhruw.autoflow.automation.model.Trigger
 import com.dhruw.autoflow.automation.model.TriggerPayload
 
 /**
@@ -36,12 +37,39 @@ object TemplateResolver {
         data class Unavailable(val variable: String) : Result
     }
 
-    /** Every payload variable the language recognizes, for editor hints/validation. */
-    val supportedVariables: List<String> = listOf(
-        "notification.title", "notification.text", "notification.appName", "notification.packageName",
-        "file.name", "file.extension",
-        "battery.level", "battery.charging"
+    private val NOTIFICATION_VARIABLES = listOf(
+        "notification.title", "notification.text", "notification.appName", "notification.packageName"
     )
+    private val FILE_VARIABLES = listOf("file.name", "file.extension")
+    private val BATTERY_VARIABLES = listOf("battery.level", "battery.charging")
+
+    /** Every payload variable the language recognizes, for editor hints/validation. */
+    val supportedVariables: List<String> =
+        NOTIFICATION_VARIABLES + FILE_VARIABLES + BATTERY_VARIABLES
+
+    /**
+     * The payload variables a run started by [trigger] actually carries.
+     * [supportedVariables] spans every trigger at once, so the editor would
+     * otherwise offer `battery.level` to a notification automation that can
+     * never resolve it. Payload names only: [AUTOMATION_NAME], `result.*` and
+     * workflow locals are available whatever the trigger is.
+     */
+    fun payloadVariablesFor(trigger: Trigger?): List<String> = when (trigger) {
+        is Trigger.NotificationTrigger -> NOTIFICATION_VARIABLES
+        is Trigger.FileTrigger -> FILE_VARIABLES
+        // Both battery triggers deliver a level and a charging flag.
+        is Trigger.BatteryLevelTrigger, is Trigger.ChargingStateTrigger -> BATTERY_VARIABLES
+        // These fire on their own and carry nothing to read.
+        Trigger.ManualTrigger,
+        Trigger.DeviceBootTrigger,
+        is Trigger.TimeTrigger,
+        is Trigger.WiFiConnectionTrigger,
+        is Trigger.NetworkAvailabilityTrigger,
+        is Trigger.BluetoothConnectionTrigger,
+        is Trigger.ScreenStateTrigger,
+        is Trigger.HeadsetConnectionTrigger,
+        null -> emptyList()
+    }
 
     private const val AUTOMATION_NAME = "automation.name"
     private const val RESULT_PREFIX = "result."
