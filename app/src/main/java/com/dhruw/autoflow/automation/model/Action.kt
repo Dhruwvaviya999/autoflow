@@ -104,6 +104,31 @@ sealed interface Action {
      * Not executable — the engine records it in the log and moves on.
      */
     data class GroupMarker(val label: String) : Action
+
+    /**
+     * Speak [text] using Text-to-Speech. [text] supports templates.
+     *
+     * [languageTag] is a BCP 47 language tag (e.g. "en-US", "hi-IN"), or blank
+     * for the system default. [voiceName] names one engine voice and wins over
+     * [languageTag] when set; blank lets the engine pick for the language.
+     * [stream] decides which volume the utterance follows, [queueMode] what
+     * happens when the engine is already speaking, and [waitUntilFinished]
+     * whether the automation pauses until the words are out. With
+     * [skipIfSilent] the step says nothing while the phone is on silent or
+     * vibrate instead of talking over a muted profile.
+     */
+    data class SpeakAction(
+        val text: String,
+        val languageTag: String = "",
+        val pitch: Float = 1.0f,
+        val speechRate: Float = 1.0f,
+        val voiceName: String = "",
+        val stream: SpeakStream = SpeakStream.NOTIFICATION,
+        val queueMode: SpeakQueueMode = SpeakQueueMode.INTERRUPT,
+        val volume: Float = 1.0f,
+        val waitUntilFinished: Boolean = true,
+        val skipIfSilent: Boolean = false
+    ) : Action
 }
 
 /** The action itself, or the step inside a [Action.DisabledAction] wrapper. */
@@ -127,6 +152,7 @@ val Action.displayName: String
         is Action.UiAutomationAction -> "UI automation"
         is Action.SetVariableAction -> "Set variable"
         is Action.BranchAction -> "If / else"
+        is Action.SpeakAction -> "Speak"
         is Action.DisabledAction -> wrapped.displayName
         is Action.GroupMarker -> "Group"
     }
@@ -153,6 +179,16 @@ val Action.summary: String
             append("If ").append(condition.summary)
             append(" · ").append(thenActions.size).append(" then")
             if (elseActions.isNotEmpty()) append(" / ").append(elseActions.size).append(" else")
+        }
+        is Action.SpeakAction -> buildString {
+            append("Speak \"").append(text.trim().ifBlank { "empty" }).append("\"")
+            if (voiceName.isNotBlank()) append(" (").append(voiceName).append(")")
+            else if (languageTag.isNotBlank()) append(" (").append(languageTag).append(")")
+            if (stream != SpeakStream.NOTIFICATION) append(" · ").append(stream.label)
+            if (queueMode != SpeakQueueMode.INTERRUPT) append(" · ").append(queueMode.label)
+            if (pitch != 1.0f || speechRate != 1.0f || volume != 1.0f) append(" · tuned voice")
+            if (!waitUntilFinished) append(" · don't wait")
+            if (skipIfSilent) append(" · not on silent")
         }
         is Action.DisabledAction -> wrapped.summary
         is Action.GroupMarker -> label.trim().ifBlank { "Group" }

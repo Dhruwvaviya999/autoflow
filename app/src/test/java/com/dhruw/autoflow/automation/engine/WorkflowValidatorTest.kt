@@ -126,6 +126,96 @@ class WorkflowValidatorTest {
     }
 
     @Test
+    fun `a speak action without text is an error`() {
+        val report = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = " ")))
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("no text") })
+    }
+
+    @Test
+    fun `a speak action using an undefined variable is an error`() {
+        val report = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = "Battery {{level}}")))
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("spoken text") })
+    }
+
+    @Test
+    fun `a speak action using a variable set earlier is valid`() {
+        val report = validator.validate(
+            automation(
+                actions = listOf(
+                    Action.SetVariableAction(name = "level", value = "80"),
+                    Action.SpeakAction(text = "Battery {{level}}")
+                )
+            )
+        )
+
+        assertTrue(report.isValid)
+    }
+
+    @Test
+    fun `speak text beyond the engine limit is an error`() {
+        val report = validator.validate(
+            automation(
+                actions = listOf(
+                    Action.SpeakAction(text = "a".repeat(EngineLimits.MAX_SPEAK_TEXT_LENGTH + 1))
+                )
+            )
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("at most") })
+    }
+
+    @Test
+    fun `an out-of-range speak pitch or rate is an error`() {
+        val pitch = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = "hi", pitch = 5.0f)))
+        )
+        val rate = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = "hi", speechRate = 0f)))
+        )
+
+        assertTrue(pitch.errors.any { it.message.contains("speech pitch") })
+        assertTrue(rate.errors.any { it.message.contains("speech rate") })
+    }
+
+    @Test
+    fun `an out-of-range speak volume is an error`() {
+        val report = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = "hi", volume = 1.5f)))
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("speech volume") })
+    }
+
+    @Test
+    fun `a muted speak action is a warning not an error`() {
+        val report = validator.validate(
+            automation(actions = listOf(Action.SpeakAction(text = "hi", volume = 0f)))
+        )
+
+        assertTrue(report.isValid)
+        assertTrue(report.warnings.any { it.message.contains("zero volume") })
+    }
+
+    @Test
+    fun `a speak action at the default pitch and rate is valid`() {
+        assertTrue(
+            validator.validate(
+                automation(actions = listOf(Action.SpeakAction(text = "Charging started")))
+            ).isValid
+        )
+    }
+
+    @Test
     fun `an empty any-of group can never pass`() {
         val report = validator.validate(
             automation(conditions = listOf(Condition.OrCondition(emptyList())))

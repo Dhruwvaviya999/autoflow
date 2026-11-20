@@ -30,6 +30,29 @@ object EngineLimits {
     /** Longest a single Delay step may wait. */
     const val MAX_DELAY_MILLIS: Long = 3_600_000
 
+    /** Bounds for a Speak step's pitch and speech rate. */
+    const val MIN_SPEECH_RATIO = 0.1f
+    const val MAX_SPEECH_RATIO = 2.0f
+
+    /** Bounds for a Speak step's own volume, relative to its audio stream. */
+    const val MIN_SPEAK_VOLUME = 0.0f
+    const val MAX_SPEAK_VOLUME = 1.0f
+
+    /**
+     * Longest one utterance may hold a Speak step open. A queued utterance
+     * also waits for whatever is already speaking, so this covers that wait:
+     * without it a callback the engine never delivers would wedge every later
+     * Speak step behind it.
+     */
+    const val MAX_SPEAK_MILLIS = 120_000L
+
+    /**
+     * Longest text a Speak step may hold. The platform engine rejects an
+     * utterance over `TextToSpeech.getMaxSpeechInputLength()` (4000 on every
+     * supported level), so a longer one would only fail at run time.
+     */
+    const val MAX_SPEAK_TEXT_LENGTH = 4000
+
     /** Retries for steps that are safe to repeat, and the pause between them. */
     const val MAX_RETRIES = 2
     const val RETRY_DELAY_MILLIS: Long = 2_000

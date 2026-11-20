@@ -2,6 +2,8 @@ package com.dhruw.autoflow.data.local.converters
 
 import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
+import com.dhruw.autoflow.automation.model.SpeakQueueMode
+import com.dhruw.autoflow.automation.model.SpeakStream
 import com.dhruw.autoflow.automation.model.ConnectionEvent
 import com.dhruw.autoflow.automation.model.LevelComparison
 import com.dhruw.autoflow.automation.model.TextMatchMode
@@ -164,6 +166,52 @@ class WorkflowJsonTest {
     fun `save notification action round-trips`() {
         val actions = listOf<Action>(Action.SaveNotificationAction)
         assertEquals(actions, WorkflowJson.decodeActions(WorkflowJson.encodeActions(actions)))
+    }
+
+    @Test
+    fun `speak actions round-trip`() {
+        val actions = listOf<Action>(
+            Action.SpeakAction(text = "Charging started"),
+            Action.SpeakAction(text = "Battery {{battery.level}}", languageTag = "hi-IN"),
+            Action.SpeakAction(text = "Thank you", languageTag = "en-GB", pitch = 1.4f, speechRate = 0.8f)
+        )
+        assertEquals(actions, WorkflowJson.decodeActions(WorkflowJson.encodeActions(actions)))
+    }
+
+    @Test
+    fun `every speak option round-trips`() {
+        val action = Action.SpeakAction(
+            text = "Charger lagaya",
+            languageTag = "hi-IN",
+            pitch = 1.3f,
+            speechRate = 0.7f,
+            voiceName = "hi-in-x-hid-local",
+            stream = SpeakStream.ALARM,
+            queueMode = SpeakQueueMode.QUEUE,
+            volume = 0.4f,
+            waitUntilFinished = false,
+            skipIfSilent = true
+        )
+        val actions = listOf<Action>(action)
+        assertEquals(actions, WorkflowJson.decodeActions(WorkflowJson.encodeActions(actions)))
+    }
+
+    @Test
+    fun `a speak action saved before the advanced options still loads`() {
+        // Workflows written by the first Speak release carry only these four
+        // keys; the rest must fall back to the documented defaults.
+        val legacy = """[{"type":"speak","text":"Hi","languageTag":"en-US","pitch":1.0,"speechRate":1.0}]"""
+
+        val decoded = WorkflowJson.decodeActions(legacy).single() as Action.SpeakAction
+
+        assertEquals("Hi", decoded.text)
+        assertEquals("en-US", decoded.languageTag)
+        assertEquals("", decoded.voiceName)
+        assertEquals(SpeakStream.NOTIFICATION, decoded.stream)
+        assertEquals(SpeakQueueMode.INTERRUPT, decoded.queueMode)
+        assertEquals(1.0f, decoded.volume, 0.001f)
+        assertEquals(true, decoded.waitUntilFinished)
+        assertEquals(false, decoded.skipIfSilent)
     }
 
     @Test

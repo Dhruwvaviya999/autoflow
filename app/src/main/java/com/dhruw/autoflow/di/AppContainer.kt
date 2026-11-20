@@ -54,6 +54,8 @@ import com.dhruw.autoflow.services.notification.InstalledApps
 import com.dhruw.autoflow.services.notification.NotificationAccessManager
 import com.dhruw.autoflow.services.notification.SaveNotificationActionHandler
 import com.dhruw.autoflow.services.notification.ShowNotificationActionHandler
+import com.dhruw.autoflow.services.tts.SpeakActionHandler
+import com.dhruw.autoflow.services.tts.TtsEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -139,6 +141,14 @@ class AppContainer(context: Context) {
         appVersion = appVersionName
     )
 
+    /**
+     * Shared Text-to-Speech engine. One instance for the whole process: a
+     * per-step engine costs a few hundred milliseconds to start and clips its
+     * first word. The editor also reads its voice list and uses it to preview
+     * a Speak step.
+     */
+    val ttsEngine = TtsEngine(appContext)
+
     /** Edge detection for system triggers; in-memory by design (see class doc). */
     val systemStateTracker = SystemStateTracker()
 
@@ -168,7 +178,8 @@ class AppContainer(context: Context) {
                 notifier = notifier
             ),
             SaveNotificationActionHandler(notificationRecordRepository),
-            UiAutomationActionHandler(uiAutomationSessionManager)
+            UiAutomationActionHandler(uiAutomationSessionManager),
+            SpeakActionHandler(appContext, ttsEngine)
         )
     )
 

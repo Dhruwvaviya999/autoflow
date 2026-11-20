@@ -3,6 +3,7 @@ package com.dhruw.autoflow.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.CallSplit
@@ -98,6 +99,7 @@ val Action.icon: ImageVector
         is Action.UiAutomationAction -> Icons.Outlined.TouchApp
         is Action.SetVariableAction -> Icons.Outlined.DataObject
         is Action.BranchAction -> Icons.Outlined.CallSplit
+        is Action.SpeakAction -> Icons.AutoMirrored.Outlined.VolumeUp
         is Action.DisabledAction -> wrapped.icon
         is Action.GroupMarker -> Icons.Outlined.Label
     }

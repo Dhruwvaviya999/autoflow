@@ -4,6 +4,8 @@ import com.dhruw.autoflow.automation.model.Action
 import com.dhruw.autoflow.automation.model.Condition
 import com.dhruw.autoflow.automation.model.ConnectionEvent
 import com.dhruw.autoflow.automation.model.LevelComparison
+import com.dhruw.autoflow.automation.model.SpeakQueueMode
+import com.dhruw.autoflow.automation.model.SpeakStream
 import com.dhruw.autoflow.automation.model.ScrollDirection
 import com.dhruw.autoflow.automation.model.TextMatchMode
 import com.dhruw.autoflow.automation.model.Trigger
@@ -69,6 +71,7 @@ object WorkflowJson {
     private const val ACTION_BRANCH = "branch"
     private const val ACTION_DISABLED = "disabled"
     private const val ACTION_GROUP_MARKER = "group_marker"
+    private const val ACTION_SPEAK = "speak"
     private const val STEP_LAUNCH_APP = "launch_app"
     private const val STEP_WAIT = "wait"
     private const val STEP_WAIT_FOR_ELEMENT = "wait_for_element"
@@ -363,6 +366,20 @@ object WorkflowJson {
                 wrapped = decodeAction(json.getJSONObject("wrapped"))
             )
             ACTION_GROUP_MARKER -> Action.GroupMarker(label = json.getString("label"))
+            ACTION_SPEAK -> Action.SpeakAction(
+                text = json.getString("text"),
+                languageTag = json.optString("languageTag", ""),
+                pitch = json.optDouble("pitch", 1.0).toFloat(),
+                speechRate = json.optDouble("speechRate", 1.0).toFloat(),
+                voiceName = json.optString("voiceName", ""),
+                stream = SpeakStream.valueOf(json.optString("stream", SpeakStream.NOTIFICATION.name)),
+                queueMode = SpeakQueueMode.valueOf(
+                    json.optString("queueMode", SpeakQueueMode.INTERRUPT.name)
+                ),
+                volume = json.optDouble("volume", 1.0).toFloat(),
+                waitUntilFinished = json.optBoolean("waitUntilFinished", true),
+                skipIfSilent = json.optBoolean("skipIfSilent", false)
+            )
             else -> throw WorkflowJsonException("Unknown action type: $type")
         }
 
@@ -413,6 +430,18 @@ object WorkflowJson {
         is Action.GroupMarker -> JSONObject()
             .put(KEY_TYPE, ACTION_GROUP_MARKER)
             .put("label", action.label)
+        is Action.SpeakAction -> JSONObject()
+            .put(KEY_TYPE, ACTION_SPEAK)
+            .put("text", action.text)
+            .put("languageTag", action.languageTag)
+            .put("pitch", action.pitch.toDouble())
+            .put("speechRate", action.speechRate.toDouble())
+            .put("voiceName", action.voiceName)
+            .put("stream", action.stream.name)
+            .put("queueMode", action.queueMode.name)
+            .put("volume", action.volume.toDouble())
+            .put("waitUntilFinished", action.waitUntilFinished)
+            .put("skipIfSilent", action.skipIfSilent)
     }
 
     // --- UI steps ---

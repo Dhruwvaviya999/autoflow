@@ -21,6 +21,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.outlined.Article
 import androidx.compose.material.icons.automirrored.outlined.DriveFileMove
+import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.BatteryAlert
@@ -125,6 +126,7 @@ private sealed interface EditorDialog {
     data class SetVariable(val index: Int?) : EditorDialog
     data class Branch(val index: Int?) : EditorDialog
     data class Group(val index: Int?) : EditorDialog
+    data class Speak(val index: Int?) : EditorDialog
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -293,6 +295,7 @@ fun AutomationEditorScreen(
                             is Action.UiAutomationAction -> EditorDialog.UiAutomation(index)
                             is Action.SetVariableAction -> EditorDialog.SetVariable(index)
                             is Action.BranchAction -> EditorDialog.Branch(index)
+                            is Action.SpeakAction -> EditorDialog.Speak(index)
                             // Unwrapped above; a nested DisabledAction is not possible.
                             is Action.DisabledAction -> null
                             is Action.GroupMarker -> EditorDialog.Group(index)
@@ -508,6 +511,9 @@ fun AutomationEditorScreen(
                 },
                 PickerOption(Icons.Outlined.Label, "Group label", "Organize the steps below it") {
                     dialog = EditorDialog.Group(index = null)
+                },
+                PickerOption(Icons.AutoMirrored.Outlined.VolumeUp, "Speak", "Read text aloud using Text-to-Speech") {
+                    dialog = EditorDialog.Speak(index = null)
                 }
             ),
             onDismiss = { sheet = null }
@@ -773,6 +779,16 @@ fun AutomationEditorScreen(
 
         is EditorDialog.UiAutomation -> UiAutomationEditorDialog(
             initial = d.index?.let { state.actions[it].unwrapped as Action.UiAutomationAction },
+            onDismiss = { dialog = null },
+            onConfirm = { action ->
+                if (d.index == null) viewModel.addAction(action)
+                else viewModel.updateAction(d.index, action)
+                dialog = null
+            }
+        )
+
+        is EditorDialog.Speak -> SpeakActionDialog(
+            initial = d.index?.let { state.actions[it].unwrapped as Action.SpeakAction },
             onDismiss = { dialog = null },
             onConfirm = { action ->
                 if (d.index == null) viewModel.addAction(action)

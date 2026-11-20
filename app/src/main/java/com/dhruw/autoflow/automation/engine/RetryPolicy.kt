@@ -22,7 +22,8 @@ object RetryPolicy {
         is Action.SaveNotificationAction,
         is Action.InstagramAnalysisAction,
         is Action.SetVariableAction,
-        is Action.DelayAction -> true
+        is Action.DelayAction,
+        is Action.SpeakAction -> true
 
         // A copy that failed may have left a partial file; the handler names
         // copies uniquely, so a retry would create a second one.

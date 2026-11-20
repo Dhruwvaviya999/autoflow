@@ -285,6 +285,45 @@ class WorkflowValidator {
                     }
                 }
             }
+            is Action.SpeakAction -> {
+                if (a.text.isBlank()) {
+                    issues += ValidationIssue(IssueSeverity.ERROR, "The speak action has no text.")
+                }
+                if (a.text.length > EngineLimits.MAX_SPEAK_TEXT_LENGTH) {
+                    issues += ValidationIssue(
+                        IssueSeverity.ERROR,
+                        "The spoken text may be at most ${EngineLimits.MAX_SPEAK_TEXT_LENGTH} characters."
+                    )
+                }
+                checkTemplate(a.text, "spoken text", defined, issues)
+                if (a.pitch !in EngineLimits.MIN_SPEECH_RATIO..EngineLimits.MAX_SPEECH_RATIO) {
+                    issues += ValidationIssue(
+                        IssueSeverity.ERROR,
+                        "The speech pitch must be between ${EngineLimits.MIN_SPEECH_RATIO} " +
+                            "and ${EngineLimits.MAX_SPEECH_RATIO}."
+                    )
+                }
+                if (a.speechRate !in EngineLimits.MIN_SPEECH_RATIO..EngineLimits.MAX_SPEECH_RATIO) {
+                    issues += ValidationIssue(
+                        IssueSeverity.ERROR,
+                        "The speech rate must be between ${EngineLimits.MIN_SPEECH_RATIO} " +
+                            "and ${EngineLimits.MAX_SPEECH_RATIO}."
+                    )
+                }
+                if (a.volume !in EngineLimits.MIN_SPEAK_VOLUME..EngineLimits.MAX_SPEAK_VOLUME) {
+                    issues += ValidationIssue(
+                        IssueSeverity.ERROR,
+                        "The speech volume must be between ${EngineLimits.MIN_SPEAK_VOLUME} " +
+                            "and ${EngineLimits.MAX_SPEAK_VOLUME}."
+                    )
+                }
+                if (a.volume == EngineLimits.MIN_SPEAK_VOLUME) {
+                    issues += ValidationIssue(
+                        IssueSeverity.WARNING,
+                        "A Speak step is set to zero volume, so nothing will be heard."
+                    )
+                }
+            }
             is Action.GroupMarker -> {
                 if (a.label.isBlank()) {
                     issues += ValidationIssue(IssueSeverity.WARNING, "A group label is empty.")
