@@ -102,7 +102,74 @@ class WorkflowValidatorTest {
     @Test
     fun `payload variables need no declaration`() {
         val report = validator.validate(
-            automation(actions = listOf(Action.LogAction("{{notification.title}}")))
+            automation(
+                trigger = Trigger.NotificationTrigger(),
+                actions = listOf(Action.LogAction("{{notification.title}}"))
+            )
+        )
+
+        assertTrue(report.isValid)
+    }
+
+    @Test
+    fun `a payload variable the trigger does not provide is an error`() {
+        val report = validator.validate(
+            automation(
+                trigger = Trigger.ManualTrigger,
+                actions = listOf(Action.LogAction("{{notification.title}}"))
+            )
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("does not provide") })
+    }
+
+    @Test
+    fun `swapping the trigger invalidates a template it can no longer fill`() {
+        val actions = listOf(Action.SpeakAction(text = "Battery {{battery.level}}"))
+
+        assertTrue(
+            validator.validate(
+                automation(trigger = Trigger.ChargingStateTrigger(onCharging = true), actions = actions)
+            ).isValid
+        )
+        // Same workflow, trigger changed to one that carries no battery level.
+        assertFalse(
+            validator.validate(
+                automation(trigger = Trigger.DeviceBootTrigger, actions = actions)
+            ).isValid
+        )
+    }
+
+    @Test
+    fun `a payload variable is checked inside a branch too`() {
+        val report = validator.validate(
+            automation(
+                trigger = Trigger.ManualTrigger,
+                actions = listOf(
+                    Action.BranchAction(
+                        condition = Condition.AlwaysCondition,
+                        thenActions = listOf(Action.LogAction("{{file.name}}")),
+                        elseActions = emptyList()
+                    )
+                )
+            )
+        )
+
+        assertFalse(report.isValid)
+        assertTrue(report.errors.any { it.message.contains("does not provide") })
+    }
+
+    @Test
+    fun `automation name and locals do not depend on the trigger`() {
+        val report = validator.validate(
+            automation(
+                trigger = Trigger.ManualTrigger,
+                actions = listOf(
+                    Action.SetVariableAction(name = "jobType", value = "scan"),
+                    Action.LogAction("{{automation.name}} ran {{jobType}} ({{result.count}})")
+                )
+            )
         )
 
         assertTrue(report.isValid)

@@ -84,14 +84,32 @@ object TemplateResolver {
      * produce) — used by the editor and the workflow validator so a template
      * is checked before it can ever run. `result.*` names are accepted
      * structurally: which keys exist depends on the actions that ran.
+     *
+     * [availablePayloadVariables] narrows the payload half of the allow-list to
+     * what one trigger delivers, normally [payloadVariablesFor] of the
+     * automation's own trigger. Without it a name like `battery.level` passes
+     * on a manual automation and only fails once the automation runs. Pass
+     * null where the trigger is not known — a single UI step being checked on
+     * its own — to skip that half of the check.
      */
-    fun validate(template: String, knownRunVariables: Set<String> = emptySet()): Result {
+    fun validate(
+        template: String,
+        knownRunVariables: Set<String> = emptySet(),
+        availablePayloadVariables: Set<String>? = null
+    ): Result {
         for (name in variablesIn(template)) {
-            val known = name in supportedVariables ||
+            val isPayload = name in supportedVariables
+            val known = isPayload ||
                 name == AUTOMATION_NAME ||
                 name.startsWith(RESULT_PREFIX) ||
                 name in knownRunVariables
             if (!known) return Result.UnknownVariable(name)
+            if (isPayload &&
+                availablePayloadVariables != null &&
+                name !in availablePayloadVariables
+            ) {
+                return Result.Unavailable(name)
+            }
         }
         return Result.Ok(template)
     }

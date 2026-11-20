@@ -78,11 +78,13 @@ class WorkflowValidator {
             )
         }
 
-        // Variables: locals must be defined before they are used. Payload
-        // variables and result.* keys are checked structurally by the resolver.
+        // Variables: locals must be defined before they are used, and a
+        // payload variable must be one this trigger actually delivers.
+        // result.* keys stay structural — which exist depends on what ran.
+        val available = TemplateResolver.payloadVariablesFor(automation.trigger).toSet()
         val defined = mutableSetOf<String>()
         automation.actions.forEach { action ->
-            validateAction(action, depth = 0, defined = defined, issues = issues)
+            validateAction(action, depth = 0, defined = defined, available = available, issues = issues)
         }
 
         automation.requiredCapabilities.forEach { capability ->
@@ -189,6 +191,7 @@ class WorkflowValidator {
         action: Action,
         depth: Int,
         defined: MutableSet<String>,
+        available: Set<String>,
         issues: MutableList<ValidationIssue>
     ) {
         if (depth > EngineLimits.MAX_BRANCH_DEPTH) {
@@ -203,10 +206,10 @@ class WorkflowValidator {
                 if (a.title.isBlank()) {
                     issues += ValidationIssue(IssueSeverity.ERROR, "The notification action has no title.")
                 }
-                checkTemplate(a.title, "notification title", defined, issues)
-                checkTemplate(a.message, "notification message", defined, issues)
+                checkTemplate(a.title, "notification title", defined, available, issues)
+                checkTemplate(a.message, "notification message", defined, available, issues)
             }
-            is Action.LogAction -> checkTemplate(a.message, "log message", defined, issues)
+            is Action.LogAction -> checkTemplate(a.message, "log message", defined, available, issues)
             is Action.DelayAction -> {
                 if (a.durationMillis !in 0..EngineLimits.MAX_DELAY_MILLIS) {
                     issues += ValidationIssue(
@@ -223,7 +226,7 @@ class WorkflowValidator {
                         "\"${a.name}\" is not a valid variable name."
                     )
                 } else {
-                    checkTemplate(a.value, "variable \"$name\"", defined, issues)
+                    checkTemplate(a.value, "variable \"$name\"", defined, available, issues)
                     defined += name
                 }
             }
@@ -231,7 +234,7 @@ class WorkflowValidator {
                 if (a.newName.isBlank()) {
                     issues += ValidationIssue(IssueSeverity.ERROR, "The rename action has no new name.")
                 }
-                checkTemplate(a.newName, "new file name", defined, issues)
+                checkTemplate(a.newName, "new file name", defined, available, issues)
             }
             is Action.CopyFileAction -> {
                 if (a.destinationFolderUri.isBlank()) {
@@ -252,9 +255,9 @@ class WorkflowValidator {
                 // guaranteed for later steps: validate its inner steps against
                 // a copy and do not export the names.
                 val branchScope = defined.toMutableSet()
-                a.thenActions.forEach { validateAction(it, depth + 1, branchScope, issues) }
+                a.thenActions.forEach { validateAction(it, depth + 1, branchScope, available, issues) }
                 val elseScope = defined.toMutableSet()
-                a.elseActions.forEach { validateAction(it, depth + 1, elseScope, issues) }
+                a.elseActions.forEach { validateAction(it, depth + 1, elseScope, available, issues) }
             }
             is Action.UiAutomationAction -> {
                 when (val r = UiWorkflowValidator.validate(a)) {
@@ -281,7 +284,7 @@ class WorkflowValidator {
                 }
                 a.steps.forEach { step ->
                     if (step is com.dhruw.autoflow.automation.model.UiStep.SetText) {
-                        checkTemplate(step.text, "typed text", defined, issues)
+                        checkTemplate(step.text, "typed text", defined, available, issues)
                     }
                 }
             }
@@ -295,7 +298,7 @@ class WorkflowValidator {
                         "The spoken text may be at most ${EngineLimits.MAX_SPEAK_TEXT_LENGTH} characters."
                     )
                 }
-                checkTemplate(a.text, "spoken text", defined, issues)
+                checkTemplate(a.text, "spoken text", defined, available, issues)
                 if (a.pitch !in EngineLimits.MIN_SPEECH_RATIO..EngineLimits.MAX_SPEECH_RATIO) {
                     issues += ValidationIssue(
                         IssueSeverity.ERROR,
@@ -337,14 +340,22 @@ class WorkflowValidator {
         template: String,
         what: String,
         defined: Set<String>,
+        available: Set<String>,
         issues: MutableList<ValidationIssue>
     ) {
-        when (val r = TemplateResolver.validate(template, defined)) {
+        when (val r = TemplateResolver.validate(template, defined, available)) {
             is TemplateResolver.Result.UnknownVariable ->
                 issues += ValidationIssue(
                     IssueSeverity.ERROR,
                     "The $what uses {{${r.variable}}}, which is not a known variable. " +
                         "Set it with a Set variable step first, or use one of the trigger variables."
+                )
+            is TemplateResolver.Result.Unavailable ->
+                issues += ValidationIssue(
+                    IssueSeverity.ERROR,
+                    "The $what uses {{${r.variable}}}, which this automation's trigger " +
+                        "does not provide. Change the trigger, or set the value with a " +
+                        "Set variable step first."
                 )
             else -> Unit
         }
